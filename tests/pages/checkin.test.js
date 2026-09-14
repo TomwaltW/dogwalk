@@ -45,9 +45,15 @@ function callsOf(page, name) {
 async function open(dogs, query) {
   api.listMyDogs.mockResolvedValue(dogs);
   const page = loadPage(PAGE);
+  // mini-runtime 在 require 完就还原了 global.wx,页面方法是之后才调的,挂回去
+  global.wx = page.__wx;
   await page.onLoad.call(page, query || { spotId: 's1' });
   return page;
 }
+
+afterEach(() => {
+  delete global.wx;
+});
 
 beforeEach(() => {
   clock.nowIso.mockReturnValue(NOW);
@@ -91,6 +97,14 @@ describe('pages/checkin —— 发广播', () => {
   test('多只狗时不替用户做主,一只都不预选', async () => {
     const page = await open([dog('d1', '豆豆'), dog('d2', '球球')]);
     expect(page.data.selectedDogIds).toEqual([]);
+  });
+
+  test('选中状态同步标在 dogs 上,WXML 才渲染得出来', async () => {
+    const page = await open([dog('d1', '豆豆'), dog('d2', '球球')]);
+    expect(page.data.dogs.map((d) => d.selected)).toEqual([false, false]);
+
+    page.toggleDog.call(page, { currentTarget: { dataset: { dogId: 'd2' } } });
+    expect(page.data.dogs.map((d) => d.selected)).toEqual([false, true]);
   });
 
   test('toggleDog 选中再点一次取消', async () => {
@@ -168,6 +182,7 @@ describe('pages/checkin —— 发广播', () => {
   test('拉狗列表失败时 errMsg 非空,onLoad 自身不抛异常', async () => {
     api.listMyDogs.mockRejectedValue(new ApiError('AUTH_REQUIRED', 'AUTH_REQUIRED'));
     const page = loadPage(PAGE);
+    global.wx = page.__wx;
 
     await expect(page.onLoad.call(page, { spotId: 's1' })).resolves.not.toThrow();
 

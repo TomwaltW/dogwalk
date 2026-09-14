@@ -54,6 +54,21 @@ function board(sessions, extra) {
   );
 }
 
+/**
+ * mini-runtime 在 require 完就把 global.wx 还原了,而页面方法是在那之后才调用的,
+ * 所以这里把本次注入的 wx 重新挂回去,afterEach 再摘掉 —— 页面源码因此可以保持
+ * 小程序里惯常的 wx.navigateTo(...) 写法,调用记录照常落在 page.__wx.__calls。
+ */
+function openPage() {
+  const page = loadPage(PAGE);
+  global.wx = page.__wx;
+  return page;
+}
+
+afterEach(() => {
+  delete global.wx;
+});
+
 function callsOf(page, name) {
   return page.__wx.__calls.filter((c) => c.name === name);
 }
@@ -63,7 +78,7 @@ describe('pages/spot —— 点位看板', () => {
     const sessions = [session('o1', '豆豆妈', ['豆豆']), session('o2', '球球爸', ['球球', '小白'])];
     api.getSpotBoard.mockResolvedValue(board(sessions));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
 
     expect(api.getSpotBoard).toHaveBeenCalledWith('s1');
@@ -77,7 +92,7 @@ describe('pages/spot —— 点位看板', () => {
   test('api 抛错时 data.errMsg 非空,且 onLoad 自身不抛异常', async () => {
     api.getSpotBoard.mockRejectedValue(new ApiError('INTERNAL', 'callFunction spotBoard failed'));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await expect(page.onLoad.call(page, { spotId: 's1' })).resolves.not.toThrow();
 
     expect(page.data.errMsg).not.toBe('');
@@ -88,7 +103,7 @@ describe('pages/spot —— 点位看板', () => {
   test('NOT_FOUND 给的是「点位不存在」这种人话,不是裸错误码', async () => {
     api.getSpotBoard.mockRejectedValue(new ApiError('NOT_FOUND', 'spots'));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 'nope' });
 
     expect(page.data.errMsg).toContain('点位');
@@ -96,7 +111,7 @@ describe('pages/spot —— 点位看板', () => {
   });
 
   test('query 里没有 spotId 时本地拦下,不调 api', async () => {
-    const page = loadPage(PAGE);
+    const page = openPage();
     await expect(page.onLoad.call(page, {})).resolves.not.toThrow();
 
     expect(api.getSpotBoard).not.toHaveBeenCalled();
@@ -108,7 +123,7 @@ describe('pages/spot —— 点位看板', () => {
       board([session('o1', '豆豆妈', ['豆豆']), session('o2', '球球爸', ['球球', '小白'])])
     );
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
 
     expect(page.data.peopleCount).toBe(2);
@@ -120,7 +135,7 @@ describe('pages/spot —— 点位看板', () => {
       board([session('o2', '球球爸', ['球球', '小白'], { note: '带球来的' })])
     );
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
 
     const s = page.data.sessions[0];
@@ -132,7 +147,7 @@ describe('pages/spot —— 点位看板', () => {
   test('没人在场时是空数组加一句空状态,不报错', async () => {
     api.getSpotBoard.mockResolvedValue(board([]));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
 
     expect(page.data.sessions).toEqual([]);
@@ -143,7 +158,7 @@ describe('pages/spot —— 点位看板', () => {
   test('点「我出门了」跳 checkin 页并带上 spotId', async () => {
     api.getSpotBoard.mockResolvedValue(board([]));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
     page.goCheckin.call(page);
 
@@ -154,13 +169,13 @@ describe('pages/spot —— 点位看板', () => {
 
   test('有群二维码才 previewImage,没有就不弹', async () => {
     api.getSpotBoard.mockResolvedValue(board([]));
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
     page.previewQr.call(page);
     expect(callsOf(page, 'previewImage')).toHaveLength(1);
 
     api.getSpotBoard.mockResolvedValue(board([], { wxGroupQrFileID: '' }));
-    const bare = loadPage(PAGE);
+    const bare = openPage();
     await bare.onLoad.call(bare, { spotId: 's1' });
     bare.previewQr.call(bare);
     expect(callsOf(bare, 'previewImage')).toHaveLength(0);
@@ -169,7 +184,7 @@ describe('pages/spot —— 点位看板', () => {
   test('发完广播返回(onShow)刷新看板,首次进入不重复拉', async () => {
     api.getSpotBoard.mockResolvedValue(board([]));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, { spotId: 's1' });
     await page.onShow.call(page);
     expect(api.getSpotBoard).toHaveBeenCalledTimes(1);

@@ -28,6 +28,21 @@ function spot(id, name, extra) {
   );
 }
 
+/**
+ * mini-runtime 在 require 完就把 global.wx 还原了,而页面方法是在那之后才调用的,
+ * 所以这里把本次注入的 wx 重新挂回去,afterEach 再摘掉 —— 页面源码因此可以保持
+ * 小程序里惯常的 wx.navigateTo(...) 写法,调用记录照常落在 page.__wx.__calls。
+ */
+function openPage() {
+  const page = loadPage(PAGE);
+  global.wx = page.__wx;
+  return page;
+}
+
+afterEach(() => {
+  delete global.wx;
+});
+
 /** 取某个 wx API 的调用记录 */
 function callsOf(page, name) {
   return page.__wx.__calls.filter((c) => c.name === name);
@@ -42,7 +57,7 @@ describe('pages/index —— 点位列表', () => {
     ];
     api.listSpots.mockResolvedValue(seeded);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
 
     expect(api.listSpots).toHaveBeenCalledTimes(1);
@@ -55,7 +70,7 @@ describe('pages/index —— 点位列表', () => {
   test('api 抛错时 data.errMsg 非空,且 onLoad 自身不抛异常', async () => {
     api.listSpots.mockRejectedValue(new ApiError('INTERNAL', 'callFunction spotBoard failed'));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await expect(page.onLoad.call(page, {})).resolves.not.toThrow();
 
     expect(page.data.errMsg).not.toBe('');
@@ -66,7 +81,7 @@ describe('pages/index —— 点位列表', () => {
   test('AUTH_REQUIRED 也只落到 errMsg,不跳转、不白屏', async () => {
     api.listSpots.mockRejectedValue(new ApiError('AUTH_REQUIRED', 'AUTH_REQUIRED'));
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
 
     expect(page.data.errMsg).toContain('登录');
@@ -77,7 +92,7 @@ describe('pages/index —— 点位列表', () => {
   test('返回值不是数组时归一成空数组,不让脏数据进 data', async () => {
     api.listSpots.mockResolvedValue(null);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
 
     expect(page.data.spots).toEqual([]);
@@ -86,7 +101,7 @@ describe('pages/index —— 点位列表', () => {
   test('点某个点位 navigateTo 到 spot 页并带上 spotId', async () => {
     api.listSpots.mockResolvedValue([spot('s1', '中心花园南侧草坪')]);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
     page.goSpot.call(page, { currentTarget: { dataset: { spotId: 's1' } } });
 
@@ -98,7 +113,7 @@ describe('pages/index —— 点位列表', () => {
   test('dataset 里没有 spotId 就不跳转', async () => {
     api.listSpots.mockResolvedValue([]);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
     page.goSpot.call(page, { currentTarget: { dataset: {} } });
 
@@ -108,7 +123,7 @@ describe('pages/index —— 点位列表', () => {
   test('下拉刷新重新拉取,并且一定 stopPullDownRefresh', async () => {
     api.listSpots.mockResolvedValue([spot('s1', '中心花园南侧草坪')]);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
     api.listSpots.mockRejectedValue(new ApiError('INTERNAL', 'boom'));
     await expect(page.onPullDownRefresh.call(page)).resolves.not.toThrow();
@@ -121,7 +136,7 @@ describe('pages/index —— 点位列表', () => {
   test('首次进入时 onShow 不重复拉;从子页返回时才刷新在场人数', async () => {
     api.listSpots.mockResolvedValue([spot('s1', '中心花园南侧草坪')]);
 
-    const page = loadPage(PAGE);
+    const page = openPage();
     await page.onLoad.call(page, {});
     await page.onShow.call(page); // 紧跟在 onLoad 后面的那次,应当跳过
     expect(api.listSpots).toHaveBeenCalledTimes(1);
