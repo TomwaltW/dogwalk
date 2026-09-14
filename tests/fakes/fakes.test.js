@@ -155,7 +155,10 @@ describe('mini-runtime', () => {
     const had = Object.prototype.hasOwnProperty.call(global, 'Page');
     const page = loadPage('miniprogram/pages/index/index.js');
     expect(typeof page).toBe('object');
-    expect(page.data).toEqual({});
+    // 只验 data 是个对象。早先写的是 toEqual({}),那是在断言「首页此刻还没有 data」,
+    // T4 一填真实 data 就必然红 —— 同上,临时状态不该写成永久断言。
+    expect(page.data).toBeInstanceOf(Object);
+    expect(page.data).not.toBeNull();
     expect(Object.prototype.hasOwnProperty.call(global, 'Page')).toBe(had);
   });
 
@@ -255,7 +258,10 @@ describe('_shared 契约', () => {
     });
   });
 
-  test('八个云函数的 core 都是 async 函数且 reject NOT_IMPLEMENTED', async () => {
+  // 注意:这里只验「八个 core 的骨架在、签名对」,不验它们实现到什么程度。
+  // 早先这条断言写的是 rejects.toThrow('NOT_IMPLEMENTED') —— 那是把「此刻还是空实现」
+  // 这个临时状态写成了永久断言,T1-T3 一旦真的实现 core 就必然红,而它们又无权改这里。
+  test('八个云函数的 core 都是可调用的 async 函数', async () => {
     const names = [
       'login', 'dogCRUD', 'checkin', 'checkinCancel',
       'spotBoard', 'genTagCode', 'scanTag', 'dailyJob',
@@ -263,7 +269,11 @@ describe('_shared 契约', () => {
     for (const n of names) {
       const core = require('../../cloudfunctions/' + n + '/core');
       expect(typeof core).toBe('function');
-      await expect(core({}, {})).rejects.toThrow('NOT_IMPLEMENTED');
+      const ret = core({}, {});
+      expect(ret).toBeInstanceOf(Promise);
+      // 空实现会 reject NOT_IMPLEMENTED,实现完的会 resolve 或 reject 业务错误,
+      // 两种都不该让这条用例红 —— 它只管骨架在不在。
+      await ret.catch(() => {});
     }
   });
 });
