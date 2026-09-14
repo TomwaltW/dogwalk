@@ -1,0 +1,10 @@
+node_modules/
+dist/
+
+# deploy-shared.js --in-place 生成的 _shared 副本,不入库
+cloudfunctions/*/_shared/
+
+# 云开发 / 微信开发者工具本地产物
+project.private.config.json
+.DS_Store
+*.log

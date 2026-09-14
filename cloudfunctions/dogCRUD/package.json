@@ -1,0 +1,10 @@
+{
+  "name": "dogCRUD",
+  "version": "1.0.0",
+  "private": true,
+  "description": "dogwalk 云函数 dogCRUD",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

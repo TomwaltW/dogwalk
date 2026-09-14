@@ -1,0 +1,21 @@
+/* 全局样式 —— 只放最基础的排版底座,页面样式各自写在自己的 wxss 里 */
+page {
+  background: #f6f6f6;
+  color: #1a1a1a;
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+}
+
+.container {
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.muted {
+  color: #8a8a8a;
+}
+
+.err {
+  color: #d4380d;
+}

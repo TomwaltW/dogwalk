@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/spot/spot",
+    "pages/checkin/checkin",
+    "pages/dog/edit/edit",
+    "pages/dog/profile/profile",
+    "pages/me/me"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "遛狗",
+    "backgroundColor": "#f6f6f6",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}
