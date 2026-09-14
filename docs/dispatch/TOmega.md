@@ -2,19 +2,24 @@
 
 ## 1. 工作区命令
 
-TΩ 在主干上做,**不开新 worktree**:
+TΩ 在主干上做,**不开新 worktree**(T1-T5 的五个 worktree 已经建好,你要合的就是它们):
 
 ```bash
-cd ~/dogwalk && git checkout main && git pull --ff-only 2>/dev/null; npm install
+cd ~/dogwalk && git checkout main && npm install
 ```
 
-开场自检(先摸清五条轨的落地情况,再动手合):
+本仓没有 remote,不用 pull。
+
+开场自检(四条都对上再动手,对不上先停下报告):
 
 ```bash
-git worktree list                     # 期望: 看到 T1-T5 的 worktree 都在
-git log --oneline baseline..HEAD      # 期望: 主干还停在 baseline 或只有派工包提交
-npm test                              # 期望末尾: Tests: 29 passed, 29 total(合流前的起点)
+git worktree list       # 期望: 主仓 + .worktrees/task-t1 .. task-t5 共 6 行
+git log --oneline -1    # 期望: 主干在 G 的提交上(派工包与校验脚本)
+npm test                # 期望末尾: Tests: 29 passed, 29 total(合流前的起点)
+node scripts/check-dispatch.js   # 期望末行: DISPATCH-CHECK pass tasks=6 conflicts=0
 ```
+
+五条轨各自的分支名就是 `task-t1` .. `task-t5`,基线都钉在 `00e2c96`(= tag `baseline`)。
 
 合流顺序建议按依赖从浅到深:T1 → T2 → T3 → T4 → T5。每合一条立刻跑一次 `npm test`,
 **红了就地解决,不要攒到最后**。
