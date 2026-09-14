@@ -1,3 +1,121 @@
 <view class="container">
-  <text class="muted">狗档案</text>
+  <view wx:if="{{errMsg}}" class="err banner">{{errMsg}}</view>
+  <view wx:if="{{loading}}" class="muted">加载中…</view>
+
+  <view wx:else class="form">
+    <view class="field">
+      <text class="label">名字 <text class="muted">{{view.nameLen}}/{{nameMax}}</text></text>
+      <input
+        class="input"
+        value="{{dog.name}}"
+        maxlength="{{nameMax}}"
+        placeholder="最多 {{nameMax}} 个字"
+        data-field="name"
+        bindinput="onFieldInput"
+      />
+    </view>
+
+    <view class="field">
+      <text class="label">品种</text>
+      <input
+        class="input"
+        value="{{dog.breed}}"
+        placeholder="柴犬、串串…随便写"
+        data-field="breed"
+        bindinput="onFieldInput"
+      />
+    </view>
+
+    <view class="field">
+      <text class="label">体型</text>
+      <picker
+        range="{{sizeClassOptions}}"
+        range-key="label"
+        data-field="sizeClass"
+        data-options="sizeClassOptions"
+        bindchange="onPickerChange"
+      >
+        <view class="picked">{{view.sizeClassText}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="label">性别</text>
+      <picker
+        range="{{genderOptions}}"
+        range-key="label"
+        data-field="gender"
+        data-options="genderOptions"
+        bindchange="onPickerChange"
+      >
+        <view class="picked">{{view.genderText}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="label">出生年月</text>
+      <input
+        class="input"
+        value="{{dog.birthMonth}}"
+        placeholder="2023-05,不填也行"
+        data-field="birthMonth"
+        bindinput="onFieldInput"
+      />
+    </view>
+
+    <view class="field row">
+      <text class="label">已绝育</text>
+      <switch checked="{{dog.neutered}}" data-field="neutered" bindchange="onFieldInput" />
+    </view>
+
+    <view class="field">
+      <text class="label">玩法</text>
+      <view class="chips">
+        <view
+          wx:for="{{playStyleOptions}}"
+          wx:key="value"
+          class="chip {{view.playStyleChecked[item.value] ? 'on' : ''}}"
+          data-field="playStyle"
+          data-value="{{item.value}}"
+          bindtap="onToggleMulti"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="field">
+      <text class="label">性格</text>
+      <view class="chips">
+        <view
+          wx:for="{{temperamentOptions}}"
+          wx:key="value"
+          class="chip {{view.temperamentChecked[item.value] ? 'on' : ''}}"
+          data-field="temperament"
+          data-value="{{item.value}}"
+          bindtap="onToggleMulti"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="field row">
+      <text class="label">和小型犬处得来</text>
+      <switch checked="{{dog.okWithSmallDogs}}" data-field="okWithSmallDogs" bindchange="onFieldInput" />
+    </view>
+
+    <view class="field row">
+      <text class="label">参与社交(在看板露出)</text>
+      <switch checked="{{dog.socialOk}}" data-field="socialOk" bindchange="onFieldInput" />
+    </view>
+
+    <view wx:if="{{!isNew}}" class="field tag">
+      <text class="label">狗牌</text>
+      <block wx:if="{{dog.tagCode}}">
+        <text class="code">{{dog.tagCode}}</text>
+        <image wx:if="{{dog.qrFileID}}" class="qr" src="{{dog.qrFileID}}" bindtap="onPreviewTag" mode="widthFix" />
+      </block>
+      <button wx:else class="ghost" bindtap="onGenTag">生成狗牌二维码</button>
+    </view>
+
+    <button class="primary" loading="{{saving}}" bindtap="onSave">保存</button>
+    <button wx:if="{{!isNew}}" class="danger" bindtap="onRemove">删除这只狗</button>
+  </view>
 </view>

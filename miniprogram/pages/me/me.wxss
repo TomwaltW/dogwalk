@@ -1,1 +1,98 @@
 /* miniprogram/pages/me/me.wxss */
+.head {
+  padding: 32rpx 0;
+  text-align: center;
+}
+
+.avatar {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background: #eee;
+}
+
+.nickname {
+  margin-top: 12rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.banner {
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+  background: #fff2e8;
+  border-radius: 12rpx;
+}
+
+.section {
+  padding: 20rpx 24rpx;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.add {
+  color: #1a6dd4;
+  font-size: 26rpx;
+}
+
+.empty {
+  padding: 48rpx 0;
+  text-align: center;
+}
+
+.dog {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.dog:last-child {
+  border-bottom: none;
+}
+
+.dog-main {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.thumb {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: #eee;
+  margin-right: 20rpx;
+}
+
+.thumb.placeholder {
+  line-height: 88rpx;
+  text-align: center;
+  font-size: 44rpx;
+}
+
+.dog-name {
+  font-size: 30rpx;
+}
+
+.sub {
+  font-size: 24rpx;
+}
+
+.link {
+  color: #1a6dd4;
+  font-size: 24rpx;
+}
+
+.link.off {
+  color: #b8b8b8;
+}
