@@ -62,9 +62,14 @@ C2 是 TΩ 自己也要过的验收。
    跌了说明有轨把别人的测试改红了或删了。
 3. `tests/pages/checkin.test.js`(T4)和 `tests/cloud/checkin.test.js`(T2)是两个不同文件,
    合流时别被文件名骗了合成一个。
-4. T3 的 B5 有一个**契约缺口**(`ownerContact` 在 3.2 的 users / dogs 字段表里没有来源字段)。
-   如果总管还没补契约,B5 的 `lostMode` 分支会是 blocked —— 这时 TΩ 的「全部 B」也过不了,
-   **照实报 blocked,不要自己给 `ownerContact` 编一个来源把测试刷绿**。
+4. **`ownerContact` 的契约缺口已经从 T3 的范围里切出去了,你会在合流后看到两处痕迹:**
+   `cloudfunctions/scanTag/core.js` 里一个 `resolveOwnerContact()` 返回 `null` 的接缝函数,
+   和 `tests/cloud/scanTag.test.js` 里一条 `test.todo('lostMode 时 ownerContact 的取值 ...')`。
+   这是**预期状态,不是 T3 没做完** —— 门控逻辑(`lostMode ? resolve(...) : null`)是测过的,
+   缺的只是来源字段。所以:`npm test` 的末行会带一条 `todo`(形如 `Tests: 1 todo, N passed, M total`),
+   退出码仍是 0,**这不算 A3 失败**。
+   **不要删掉那条 todo 刷绿,不要自己给 `ownerContact` 编一个来源。**
+   总管补完契约后,改 `resolveOwnerContact` 一个函数体 + 把 todo 换成真用例即可。
 5. 云函数的 `_shared` 路径差异由 `scripts/deploy-shared.js` 负责(默认产出到 `dist/`,不改仓库源文件)。
    合流后跑一次 `node scripts/deploy-shared.js` 确认八个函数都能打出包,**但不要部署**
    —— 云环境联调不在本轮范围(SPEC 第 1 节)。
@@ -78,7 +83,7 @@ C2 是 TΩ 自己也要过的验收。
 |---|---|---|
 | A1 | `npm install` | 退出码 0 |
 | A2 | `npm run lint` | 退出码 0,输出中无 `error` |
-| A3 | `npm test` | 退出码 0,末行形如 `Tests: N passed, N total` |
+| A3 | `npm test` | 退出码 0,末行形如 `Tests: N passed, N total`;带一条 `todo` 是预期的,见实现要点第 4 条 |
 
 ### 行为正确
 
@@ -88,7 +93,7 @@ C2 是 TΩ 自己也要过的验收。
 | B2 | `npm test -- tests/cloud/dogCRUD.test.js` | 全绿:create 返回带 `_id` 的 dog;update 他人的狗返回 `code:'FORBIDDEN'`;`sizeClass` 非法值返回 `code:'INVALID_PARAM'` |
 | B3 | `npm test -- tests/cloud/checkin.test.js` | 全绿:`expireAt - startAt === 90*60*1000`;同点位重复广播返回 `code:'CONFLICT'` |
 | B4 | `npm test -- tests/cloud/spotBoard.test.js` | 全绿:只返回 `expireAt > now` 且 `status==='active'` 的广播;过期的不出现;无广播返回空数组 |
-| B5 | `npm test -- tests/cloud/scanTag.test.js` | 全绿:非走失返回公开档案不含联系方式;`lostMode:true` 时含 `ownerContact`;写入一条 scanLogs。**见实现要点第 4 条** |
+| B5 | `npm test -- tests/cloud/scanTag.test.js` | 全绿:非走失返回公开档案、`ownerContact` 为 `null`;走失态走到门控分支;写入一条 scanLogs;游客态 `scannerOpenid` 为 `''`。取值那条挂 `test.todo`,**见实现要点第 4 条** |
 | B6 | `npm test -- tests/pages/index.test.js` | 全绿:`onLoad` 后 `data.spots` 长度等于 mock 返回数;api 抛错时 `data.errMsg` 非空且不抛异常 |
 | B7 | `npm test -- tests/pages/dog-profile.test.js` | 全绿:游客态正常渲染,`data.dog` 有值,不跳转登录 |
 | B8 | `npm test -- tests/logic/presence.test.js` | 全绿:`aggregateBoard()` 合并同一用户多只狗;`isActive()` 对恰好等于 `expireAt` 返回 `false` |
