@@ -76,6 +76,7 @@ describe('login: 首次调用', () => {
         'status',
         'subQuota',
         'subTemplates',
+        'unionid',
         'updatedAt',
       ].sort()
     );
@@ -159,6 +160,68 @@ describe('login: 二次调用', () => {
     await core({}, ctx);
 
     expect(dump(COLL.USERS)[0].legacyLeftover).toEqual(['s1']);
+  });
+});
+
+// 跨端身份 —— 口径见 _shared/runtime.js 的 handler 注释:
+// UNIONID 只记录不夺权,主键永远是 openid,绑定开放平台那天不需要做数据迁移。
+describe('login: unionid(为 App 版留的接缝)', () => {
+  test('没绑开放平台时 unionid 存空串,不影响任何本端逻辑', async () => {
+    const { ctx, dump } = setup({});
+    const r = await core({}, ctx);
+
+    expect(r.ok).toBe(true);
+    expect(dump(COLL.USERS)[0].unionid).toBe('');
+    expect(dump(COLL.USERS)[0]._id).toBe('o1'); // 主键仍是 openid
+  });
+
+  test('绑了开放平台时把 unionid 一起存下来,但主键仍是 openid', async () => {
+    const { ctx, dump } = makeTestCtx({ seed: {}, openid: 'o1', unionid: 'u_abc' });
+    await core({}, ctx);
+
+    const row = dump(COLL.USERS)[0];
+    expect(row.unionid).toBe('u_abc');
+    expect(row._id).toBe('o1');
+    expect(row._openid).toBe('o1');
+  });
+
+  test('绑定之前注册的老用户,回来登录一次就自动补上 unionid', async () => {
+    const { ctx, dump } = makeTestCtx({
+      seed: { users: [seededUser({ unionid: '' })] },
+      openid: 'o1',
+      unionid: 'u_abc',
+    });
+
+    await core({}, ctx);
+
+    const row = dump(COLL.USERS)[0];
+    expect(row.unionid).toBe('u_abc');
+    // 补录不该动别的:额度、模板、创建时间原样
+    expect(row.subQuota).toEqual({ foundReport: 3 });
+    expect(row.createdAt.getTime()).not.toBe(NOW_MS);
+  });
+
+  test('unionid 没变时不写库(不为补录白写一次)', async () => {
+    const { ctx, dump } = makeTestCtx({
+      seed: { users: [seededUser({ unionid: 'u_abc' })] },
+      openid: 'o1',
+      unionid: 'u_abc',
+    });
+    const before = dump(COLL.USERS)[0].updatedAt.getTime();
+
+    await core({}, ctx);
+
+    expect(dump(COLL.USERS)[0].updatedAt.getTime()).toBe(before);
+  });
+
+  test('App 侧的查法:按 unionid 反查得到那条用户,拿它的 _id 当身份', async () => {
+    const { ctx, db, dump } = makeTestCtx({ seed: {}, openid: 'o1', unionid: 'u_abc' });
+    await core({}, ctx);
+
+    const hit = await db.collection(COLL.USERS).where({ unionid: 'u_abc' }).get();
+    expect(hit.data).toHaveLength(1);
+    expect(hit.data[0]._id).toBe('o1');
+    expect(dump(COLL.USERS)).toHaveLength(1);
   });
 });
 

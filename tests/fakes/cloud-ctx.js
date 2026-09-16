@@ -28,6 +28,7 @@ const DEFAULT_NOW = '2026-09-16T10:00:00+08:00';
  * @param {object} [opts]
  * @param {Object<string, Array<object>>} [opts.seed]
  * @param {string} [opts.openid]         缺省 ''(游客)
+ * @param {string} [opts.unionid]        缺省 ''(没绑微信开放平台);口径见 _shared/runtime.js
  * @param {() => Date} [opts.now]
  * @param {string[]} [opts.risky]        命中即内容不安全的词
  * @param {string[]} [opts.riskyImages]  命中即图片不安全的 fileID
@@ -96,6 +97,7 @@ function makeTestCtx(opts) {
     db,
     _,
     openid: o.openid || '',
+    unionid: o.unionid || '',
     now: o.now || fixedClock(DEFAULT_NOW),
     openapi,
     logger,

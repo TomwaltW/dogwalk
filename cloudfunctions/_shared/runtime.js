@@ -39,6 +39,7 @@ function createStorage(cloud) {
  * @param {object} opts.cloud
  * @param {object} opts.db
  * @param {string} opts.openid
+ * @param {string} [opts.unionid]
  * @param {object} [opts.logger]
  * @param {() => Date} [opts.now]
  */
@@ -51,6 +52,9 @@ function makeCtx(opts) {
     db,
     _: db.command,
     openid,
+    // 跨端身份,见下面 handler 里的说明。业务代码认人一律用 ctx.openid,
+    // 这个字段只给 login 存档用 —— 别拿它当主键判断。
+    unionid: opts.unionid || '',
     now: opts.now || (() => new Date()),
     openapi: cloud.openapi,
     logger,
@@ -60,6 +64,21 @@ function makeCtx(opts) {
 }
 
 /**
+ * 跨端身份口径(2026-09-17 加,为以后的 App 版留的接缝):
+ *
+ * OPENID 只在微信里有,独立 App 拿不到。要让两端认出同一个人,靠的是
+ * 微信开放平台的 UNIONID —— 小程序和 App 绑在同一个开放平台账号下,
+ * 同一个微信用户的 UNIONID 相同(绑定后 getWXContext() 就会带上它)。
+ *
+ * **但主键仍然是 OPENID,不是 UNIONID。** 因为开放平台认证要钱要时间,
+ * 绑定发生在哪一天是不确定的;主键要是随「这次有没有 UNIONID」而变,
+ * 绑定前注册的人和绑定后回来的同一个人会被认成两个账号,狗和约遛全丢。
+ * 所以 UNIONID 只记录、不夺权:login 把它存进用户文档(见 login/core.js),
+ * 绑定之前是空串,绑定之后老用户下次登录自动补上。
+ *
+ * App 接入时的用法:App 侧用微信登录拿到 unionid,查 users 里 unionid 相同的
+ * 那一条,取它的 _id(即 openid)当身份往下走 —— 现有 12 个云函数一行都不用改。
+ *
  * @param {object} cloud   wx-server-sdk(已 init)
  * @param {Function} core  (event, ctx) => Promise<{ok,...}>
  * @returns {Function}     exports.main
@@ -67,9 +86,15 @@ function makeCtx(opts) {
 function handler(cloud, core) {
   return async (event) => {
     try {
-      const { OPENID } = cloud.getWXContext();
+      const { OPENID, UNIONID } = cloud.getWXContext();
       const db = cloud.database();
-      const ctx = makeCtx({ cloud, db, openid: OPENID || '', logger: console });
+      const ctx = makeCtx({
+        cloud,
+        db,
+        openid: OPENID || '',
+        unionid: UNIONID || '',
+        logger: console,
+      });
       return await core(event || {}, ctx);
     } catch (e) {
       console.error(e);

@@ -72,6 +72,9 @@ module.exports = async function core(event, ctx) {
       const doc = Object.assign(
         {
           _openid: openid,
+          // 跨端身份,口径见 _shared/runtime.js 的 handler 注释:
+          // 只记录不夺权,没绑开放平台时是空串,不影响本端任何逻辑。
+          unionid: ctx.unionid || '',
           nickname: '',
           avatarFileID: '',
           subQuota: {},
@@ -84,12 +87,19 @@ module.exports = async function core(event, ctx) {
       );
       await users.doc(openid).set({ data: doc });
       user = Object.assign({ _id: openid }, doc);
-    } else if (Object.keys(patch).length) {
-      // 二次调用只覆盖 profile 带来的字段;createdAt 与两本账(subQuota /
-      // subTemplates)原样保留 —— 额度是用户一次次授权攒下来的,登录不该清零。
-      patch.updatedAt = now;
-      await users.doc(user._id).update({ data: patch });
-      user = Object.assign(user, patch);
+    } else {
+      // 绑定开放平台之前注册的老用户,这里自动补上 unionid ——
+      // 绑定那天不需要做数据迁移,人回来登录一次就补齐了。
+      if (ctx.unionid && user.unionid !== ctx.unionid) patch.unionid = ctx.unionid;
+
+      // 二次调用只覆盖 profile 带来的字段(外加上面那次补录);createdAt 与
+      // 两本账(subQuota / subTemplates)原样保留 —— 额度是用户一次次授权
+      // 攒下来的,登录不该清零。
+      if (Object.keys(patch).length) {
+        patch.updatedAt = now;
+        await users.doc(user._id).update({ data: patch });
+        user = Object.assign(user, patch);
+      }
     }
 
     const dogs = await ctx.db

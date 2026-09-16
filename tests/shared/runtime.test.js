@@ -4,7 +4,7 @@ const { handler, makeCtx, createStorage } = require('../../cloudfunctions/_share
 function fakeCloud(overrides) {
   return Object.assign(
     {
-      getWXContext: () => ({ OPENID: 'o1' }),
+      getWXContext: () => ({ OPENID: 'o1', UNIONID: 'u_abc' }),
       database: () => ({ command: { inc: () => 'inc' }, collection: () => ({}) }),
       openapi: { security: {} },
       downloadFile: async ({ fileID }) => ({ fileContent: Buffer.from('c:' + fileID) }),
@@ -25,6 +25,7 @@ describe('runtime.handler', () => {
     expect(r).toEqual({ ok: true, data: 1 });
     expect(got.event).toEqual({ a: 1 });
     expect(got.ctx.openid).toBe('o1');
+    expect(got.ctx.unionid).toBe('u_abc');
     expect(got.ctx._).toEqual({ inc: expect.any(Function) });
     expect(got.ctx.now()).toBeInstanceOf(Date);
     expect(typeof got.ctx.storage.uploadFile).toBe('function');
@@ -41,6 +42,30 @@ describe('runtime.handler', () => {
     })();
     expect(got.e).toEqual({});
     expect(got.c.openid).toBe('');
+  });
+
+  // 跨端身份接缝:没绑微信开放平台时 getWXContext() 不带 UNIONID,
+  // 此时 ctx.unionid 必须是空串而不是 undefined —— login 会把它直接写进库。
+  test('没绑开放平台时 unionid 为空串,openid 照常可用', async () => {
+    let got = null;
+    const cloud = fakeCloud({ getWXContext: () => ({ OPENID: 'o1' }) });
+    await handler(cloud, async (e, c) => {
+      got = c;
+      return { ok: true, data: null };
+    })({});
+    expect(got.unionid).toBe('');
+    expect(got.openid).toBe('o1');
+  });
+
+  test('身份基准是 openid 不是 unionid —— 两者都在时 ctx.openid 仍是 openid', async () => {
+    let got = null;
+    const cloud = fakeCloud({ getWXContext: () => ({ OPENID: 'o1', UNIONID: 'u_abc' }) });
+    await handler(cloud, async (e, c) => {
+      got = c;
+      return { ok: true, data: null };
+    })({});
+    expect(got.openid).toBe('o1');
+    expect(got.unionid).toBe('u_abc');
   });
 
   test('core 抛异常 → fail(INTERNAL),不往外抛', async () => {
