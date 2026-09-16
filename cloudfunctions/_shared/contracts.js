@@ -51,15 +51,6 @@ const LIMITS = {
   WALK_MAX_DOGS_CAP: 10,
 };
 
-// ---------------------------------------------------------------- 过渡期保留
-// 第一轮遗留。只为让各轨改完之前的旧测试不红;新代码禁止引用,TΩ2 统一删(spec 3.2.4)。
-/** @deprecated */
-const PLAY_STYLE = ['chase', 'wrestle', 'solo'];
-/** @deprecated */
-const TEMPERAMENT = ['friendly', 'shy', 'jumpy', 'antisocial'];
-/** @deprecated */
-const COLL_DEPRECATED = { SPOTS: 'spots', ENCOUNTERS: 'encounters' };
-
 module.exports = {
   COLL,
   CHECKIN_DURATION_MS,
@@ -73,7 +64,4 @@ module.exports = {
   MEMBER_STATUS,
   TEMPLATE_KEYS,
   LIMITS,
-  PLAY_STYLE,
-  TEMPERAMENT,
-  COLL_DEPRECATED,
 };
