@@ -99,6 +99,17 @@ function main() {
     process.exit(1);
   }
 
+  // 全量打包时先清空 dist:只覆盖不清理的话,上一轮删掉的云函数会作为陈旧目录留在
+  // dist/cloudfunctions/ 里,照着目录逐个上传就会把已经删掉的函数也部署上去。
+  // --only 是定点重打,不能连带清掉别的函数。
+  if (!args.inPlace && !args.only) {
+    const stale = fs.existsSync(DIST)
+      ? fs.readdirSync(DIST).filter((n) => !fns.includes(n))
+      : [];
+    stale.forEach((n) => fs.rmSync(path.join(DIST, n), { recursive: true, force: true }));
+    if (stale.length) console.log('清掉 dist 里已不存在的云函数: ' + stale.join(', '));
+  }
+
   const mode = args.inPlace ? 'in-place' : 'dist';
   console.log('模式: ' + mode + ',云函数 ' + fns.length + ' 个');
 
