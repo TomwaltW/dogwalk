@@ -1,11 +1,11 @@
 /**
- * 前端 api 封装 —— spec 3.3.3,冻结契约。
+ * 前端 api 封装 —— spec(docs/dev-spec-2026-09-16.md)3.3.3,冻结契约。
  *
  * 全部返回 Promise:成功直接 resolve data(即云函数 { ok:true, data } 里的 data);
  * 失败 reject 一个 ApiError(code, msg)。
  *
- * 页面禁止直接调 wx.cloud.callFunction,一律走这里。
- * 测试时 jest.mock('../../api/index')。
+ * 页面禁止直接调 wx.cloud.*,一律走这里。
+ * 测试时 jest.mock('../../miniprogram/api/index')。
  */
 
 class ApiError extends Error {
@@ -54,30 +54,11 @@ function call(name, data) {
   });
 }
 
+// ------------------------------------------------------------ 档案 / 身份牌 / 寻回
+
 /** @returns {Promise<{user:object, dogs:object[]}>} */
 function login(profile) {
   return call('login', profile ? { profile } : {});
-}
-
-/** @returns {Promise<object[]>} SpotSummary[] */
-function listSpots() {
-  return call('spotBoard', {});
-}
-
-/** @returns {Promise<{spot:object, sessions:object[], wxGroupQrFileID:string}>} */
-function getSpotBoard(spotId) {
-  return call('spotBoard', { spotId });
-}
-
-/** @param {{spotId:string, dogIds:string[], startAt:string, note?:string}} payload
- *  @returns {Promise<{checkinId:string, expireAt:string, notified:number}>} */
-function createCheckin(payload) {
-  return call('checkin', payload);
-}
-
-/** @returns {Promise<{cancelled:boolean}>} */
-function cancelCheckin(checkinId) {
-  return call('checkinCancel', { checkinId });
 }
 
 /** @returns {Promise<object[]>} Dog[] */
@@ -96,26 +77,195 @@ function removeDog(dogId) {
   return call('dogCRUD', { action: 'remove', dogId });
 }
 
-/** 游客可调。 @returns {Promise<object>} DogPublic */
-function getDogPublic(tagCode) {
-  return call('scanTag', { tagCode });
-}
-
 /** @returns {Promise<{tagCode:string, qrFileID:string}>} */
 function genTag(dogId) {
   return call('genTagCode', { dogId });
 }
 
+/** 游客可调。 @returns {Promise<object>} DogPublic */
+function getDogPublic(tagCode) {
+  return call('scanTag', { tagCode });
+}
+
+/**
+ * 开 / 关走失模式。内部就是 dogCRUD update,单独一个方法是为了页面语义清楚。
+ * @param {string} dogId
+ * @param {boolean} on
+ * @param {string} [note] 走失模式下给路人看的留言,关闭时可不传
+ * @returns {Promise<object>} Dog
+ */
+function setLostMode(dogId, on, note) {
+  const dog = { _id: dogId, lostMode: !!on };
+  if (note !== undefined) dog.lostNote = note;
+  return call('dogCRUD', { action: 'update', dog });
+}
+
+/**
+ * 路人扫牌留言,游客可调。
+ * @param {{tagCode:string, message:string, latitude?:number, longitude?:number}} payload
+ * @returns {Promise<{reportId:string, notified:boolean}>}
+ */
+function reportFound(payload) {
+  return call('reportFound', payload);
+}
+
+/** @returns {Promise<object[]>} FoundReport[] */
+function listFoundReports(dogId) {
+  return call('foundReports', { dogId });
+}
+
+/** 用户在 wx.requestSubscribeMessage 里同意一次就调一次。 @returns {Promise<{remaining:number}>} */
+function grantSubscribe(templateKey, templateId) {
+  return call('subscribeGrant', { templateKey, templateId });
+}
+
+// ------------------------------------------------------------ 公园 / 签到
+
+/** 幂等,parks 非空时不插。 @returns {Promise<{inserted:number, total:number}>} */
+function initParks() {
+  return call('initParks', {});
+}
+
+/** @returns {Promise<object[]>} ParkSummary[] */
+function listParks() {
+  return call('parkBoard', {});
+}
+
+/** @returns {Promise<object>} ParkBoard */
+function getParkBoard(parkId) {
+  return call('parkBoard', { parkId });
+}
+
+/**
+ * @param {{parkId:string, dogIds:string[], latitude:number, longitude:number}} payload
+ * @returns {Promise<{checkinId:string, expireAt:string}>}
+ */
+function checkin(payload) {
+  return call('checkin', payload);
+}
+
+/** @returns {Promise<{cancelled:boolean}>} */
+function cancelCheckin(checkinId) {
+  return call('checkinCancel', { checkinId });
+}
+
+// ------------------------------------------------------------ 约遛
+
+/**
+ * @param {{parkId:string, startAt:string, dogIds:string[], note?:string, maxDogs?:number}} payload
+ * @returns {Promise<object>} WalkSummary
+ */
+function createWalk(payload) {
+  return call('walkOps', Object.assign({ action: 'create' }, payload));
+}
+
+/**
+ * @param {{parkId?:string, date?:string, mine?:boolean}} [filter]
+ * @returns {Promise<object[]>} WalkSummary[]
+ */
+function listWalks(filter) {
+  return call('walkOps', Object.assign({ action: 'list' }, filter || {}));
+}
+
+/** @returns {Promise<object>} WalkDetail */
+function getWalk(walkId) {
+  return call('walkOps', { action: 'get', walkId });
+}
+
+/** @returns {Promise<{memberId:string, status:string}>} */
+function joinWalk(walkId, dogIds) {
+  return call('walkOps', { action: 'join', walkId, dogIds });
+}
+
+/** 只有发起人能调。 @returns {Promise<{memberId:string, status:string}>} */
+function decideJoin(memberId, approve) {
+  return call('walkOps', { action: 'decide', memberId, approve: !!approve });
+}
+
+/** @returns {Promise<{left:boolean}>} */
+function leaveWalk(walkId) {
+  return call('walkOps', { action: 'leave', walkId });
+}
+
+/** 只有发起人能调。 @returns {Promise<{cancelled:boolean}>} */
+function cancelWalk(walkId) {
+  return call('walkOps', { action: 'cancel', walkId });
+}
+
+/** @returns {Promise<{messageId:string}>} */
+function postMessage(walkId, text) {
+  return call('walkOps', { action: 'message', walkId, text });
+}
+
+// ------------------------------------------------------------ 云存储
+
+/**
+ * 上传本地文件到云存储。
+ * @param {string} cloudPath 云端路径,如 'dogs/<openid>/<ts>.jpg'
+ * @param {string} filePath  wx.chooseMedia 拿到的临时路径
+ * @returns {Promise<string>} fileID
+ */
+function uploadFile(cloudPath, filePath) {
+  return new Promise((resolve, reject) => {
+    wx.cloud.uploadFile({
+      cloudPath,
+      filePath,
+      success(res) {
+        if (res && res.fileID) resolve(res.fileID);
+        else reject(new ApiError(INTERNAL, 'uploadFile: no fileID'));
+      },
+      fail(err) {
+        reject(new ApiError(INTERNAL, (err && err.errMsg) || 'uploadFile failed'));
+      },
+    });
+  });
+}
+
+/**
+ * 把云存储文件下到本地临时路径(保存到相册前要先下下来)。
+ * @param {string} fileID
+ * @returns {Promise<string>} tempFilePath
+ */
+function downloadFile(fileID) {
+  return new Promise((resolve, reject) => {
+    wx.cloud.downloadFile({
+      fileID,
+      success(res) {
+        if (res && res.tempFilePath) resolve(res.tempFilePath);
+        else reject(new ApiError(INTERNAL, 'downloadFile: no tempFilePath'));
+      },
+      fail(err) {
+        reject(new ApiError(INTERNAL, (err && err.errMsg) || 'downloadFile failed'));
+      },
+    });
+  });
+}
+
 module.exports = {
   ApiError,
   login,
-  listSpots,
-  getSpotBoard,
-  createCheckin,
-  cancelCheckin,
   listMyDogs,
   saveDog,
   removeDog,
-  getDogPublic,
   genTag,
+  getDogPublic,
+  setLostMode,
+  reportFound,
+  listFoundReports,
+  grantSubscribe,
+  initParks,
+  listParks,
+  getParkBoard,
+  checkin,
+  cancelCheckin,
+  createWalk,
+  listWalks,
+  getWalk,
+  joinWalk,
+  decideJoin,
+  leaveWalk,
+  cancelWalk,
+  postMessage,
+  uploadFile,
+  downloadFile,
 };

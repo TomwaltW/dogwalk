@@ -17,15 +17,16 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
+// 第二轮的派工包直接放 docs/dispatch/,第一轮的归档在 docs/dispatch/round1/(子目录不参与校验)
 const DISPATCH_DIR = path.join(ROOT, 'docs', 'dispatch');
-const SPEC = path.join(ROOT, 'docs', 'dev-spec-2026-09-14.md');
+const SPEC = path.join(ROOT, 'docs', 'dev-spec-2026-09-16.md');
 
-/** 文件名 -> SPEC 3.5 表里的 owner 写法。TΩ 的文件名写成 TOmega(文件系统友好) */
+/** 文件名 -> SPEC 3.5 表里的 owner 写法。TΩ2 的文件名写成 TOmega2(文件系统友好) */
 const TASK_OF_FILE = {
-  T1: 'T1', T2: 'T2', T3: 'T3', T4: 'T4', T5: 'T5', TOmega: 'TΩ',
+  T6: 'T6', T7: 'T7', T8: 'T8', T9: 'T9', T10: 'T10', T11: 'T11', TOmega2: 'TΩ2',
 };
 /** 可写范围是全仓、豁免检查 2/3 的任务 */
-const EXEMPT = new Set(['TOmega']);
+const EXEMPT = new Set(['TOmega2']);
 
 /** 八个必须存在的小节标题 */
 const REQUIRED_SECTIONS = [
@@ -40,7 +41,7 @@ const REQUIRED_SECTIONS = [
 ];
 
 /** 仓库的顶层目录;判断一个路径是不是已经写全了 */
-const ROOTS = ['cloudfunctions', 'miniprogram', 'tests', 'docs', 'scripts'];
+const ROOTS = ['cloudfunctions', 'miniprogram', 'tests', 'docs', 'scripts', 'database', 'review'];
 
 // ------------------------------------------------------------- 路径工具
 
@@ -173,7 +174,7 @@ function main() {
     let checksRun = 0;
 
     if (!expectedOwner) {
-      reasons.push(`文件名 ${file} 不在已知任务表里(T1-T5 / TOmega)`);
+      reasons.push(`文件名 ${file} 不在已知任务表里(T6-T11 / TOmega2)`);
     }
 
     // --- 检查 1: 白名单解析得出来

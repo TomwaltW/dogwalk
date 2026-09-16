@@ -1,21 +1,165 @@
-/* 全局样式 —— 只放最基础的排版底座,页面样式各自写在自己的 wxss 里 */
+/* 全局样式 —— T0' 提供。主色与基础类都在这,页面只用不改(spec 3.3.4)。 */
+
 page {
-  background: #f6f6f6;
-  color: #1a1a1a;
+  /* 主题变量:改颜色只改这一处 */
+  --c-primary: #ff8a3d;        /* 明亮但不刺眼的橘 */
+  --c-primary-deep: #e6712a;
+  --c-primary-soft: #fff1e6;
+  --c-bg: #f7f5f2;
+  --c-card: #ffffff;
+  --c-text: #1f1f1f;
+  --c-muted: #8a8a8a;
+  --c-line: #eeeae5;
+  --c-ok: #12885a;
+  --c-ok-soft: #e8f6ef;
+  --c-danger: #d4380d;
+  --c-danger-soft: #fff2f0;
+  --c-warn: #b8860b;
+  --c-warn-soft: #fff8e1;
+  --radius: 20rpx;
+  --radius-sm: 12rpx;
+  --gap: 24rpx;
+
+  background: var(--c-bg);
+  color: var(--c-text);
   font-size: 28rpx;
   line-height: 1.6;
-  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', sans-serif;
 }
 
 .container {
-  padding: 24rpx;
+  padding: var(--gap);
   box-sizing: border-box;
 }
 
-.muted {
-  color: #8a8a8a;
+.muted { color: var(--c-muted); }
+.err { color: var(--c-danger); }
+
+/* 圆角卡片 */
+.card {
+  background: var(--c-card);
+  border-radius: var(--radius);
+  padding: 28rpx 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
 }
 
-.err {
-  color: #d4380d;
+/* 错误横幅 */
+.banner-err {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+  border-radius: var(--radius-sm);
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  font-size: 26rpx;
+}
+
+.banner-warn {
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+  border-radius: var(--radius-sm);
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  font-size: 26rpx;
+}
+
+/* 空状态 / 加载中 */
+.empty {
+  padding: 96rpx 32rpx;
+  text-align: center;
+  color: var(--c-muted);
+  font-size: 28rpx;
+}
+
+/* 按钮 */
+.btn-primary {
+  background: var(--c-primary);
+  color: #fff;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  border: none;
+}
+.btn-primary::after { border: none; }
+.btn-primary[disabled] { background: #f3c9ad; color: #fff; }
+
+.btn-ghost {
+  background: var(--c-card);
+  color: var(--c-primary);
+  border: 2rpx solid var(--c-primary);
+  border-radius: 999rpx;
+  font-size: 30rpx;
+}
+.btn-ghost::after { border: none; }
+
+.btn-danger {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  border: none;
+}
+.btn-danger::after { border: none; }
+
+/* 多选标签 */
+.chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.chip {
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  background: var(--c-bg);
+  color: var(--c-muted);
+  font-size: 24rpx;
+  border: 2rpx solid var(--c-line);
+}
+.chip-on {
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  border-color: var(--c-primary);
+}
+
+/* 狗头像 */
+.avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--c-line);
+  flex-shrink: 0;
+}
+.avatar-lg { width: 180rpx; height: 180rpx; }
+.avatar-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+}
+
+/* 表单 */
+.field { margin-bottom: 28rpx; }
+.field .label {
+  display: block;
+  font-size: 26rpx;
+  color: var(--c-muted);
+  margin-bottom: 10rpx;
+}
+.field .input,
+.field .textarea {
+  background: var(--c-card);
+  border-radius: var(--radius-sm);
+  padding: 18rpx 20rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  width: 100%;
+}
+.field .textarea { min-height: 160rpx; }
+.field.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.field.row .label { margin-bottom: 0; }
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin: 8rpx 0 16rpx;
 }

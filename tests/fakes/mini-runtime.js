@@ -57,26 +57,34 @@ function setByPath(root, key, value) {
   cur[segs[segs.length - 1]] = value;
 }
 
-/** 页面里常用的 wx API —— 默认全是能 resolve 的 noop,调用记录挂在 wx.__calls 上 */
+/**
+ * 页面里常用的 wx API —— 默认全是能 resolve 的 noop,调用记录挂在 wx.__calls 上。
+ * 默认 success 都给 {}(比如 getLocation 不给坐标),要有内容用 stubs.wx 覆盖:
+ *   loadPage(p, { wx: { getLocation: (o) => o.success({ latitude: 30.27, longitude: 120.15 }) } })
+ */
 function defaultWx() {
   const calls = [];
-  const record = (name) => (opts) => {
+  const record = (name, result) => (opts) => {
     calls.push({ name, opts });
-    if (opts && typeof opts.success === 'function') opts.success({});
-    if (opts && typeof opts.complete === 'function') opts.complete({});
-    return Promise.resolve({});
+    const r = result === undefined ? {} : result;
+    if (opts && typeof opts.success === 'function') opts.success(r);
+    if (opts && typeof opts.complete === 'function') opts.complete(r);
+    return Promise.resolve(r);
   };
   return {
     __calls: calls,
     cloud: {
       init: record('cloud.init'),
       callFunction: record('cloud.callFunction'),
+      uploadFile: record('cloud.uploadFile', { fileID: 'cloud://fake/uploaded' }),
+      downloadFile: record('cloud.downloadFile', { tempFilePath: '/tmp/fake-download' }),
     },
     showToast: record('showToast'),
     hideToast: record('hideToast'),
     showLoading: record('showLoading'),
     hideLoading: record('hideLoading'),
-    showModal: record('showModal'),
+    showModal: record('showModal', { confirm: true, cancel: false }),
+    showActionSheet: record('showActionSheet', { tapIndex: 0 }),
     navigateTo: record('navigateTo'),
     redirectTo: record('redirectTo'),
     switchTab: record('switchTab'),
@@ -85,11 +93,31 @@ function defaultWx() {
     setNavigationBarTitle: record('setNavigationBarTitle'),
     stopPullDownRefresh: record('stopPullDownRefresh'),
     previewImage: record('previewImage'),
-    chooseMedia: record('chooseMedia'),
+    chooseMedia: record('chooseMedia', { tempFiles: [] }),
     setStorageSync: () => {},
     getStorageSync: () => '',
     removeStorageSync: () => {},
     requestSubscribeMessage: record('requestSubscribeMessage'),
+    // 本轮新增:定位 / 相册 / 授权 / 地图 / 隐私
+    getLocation: record('getLocation'),
+    chooseLocation: record('chooseLocation'),
+    openLocation: record('openLocation'),
+    saveImageToPhotosAlbum: record('saveImageToPhotosAlbum'),
+    getSetting: record('getSetting', { authSetting: {} }),
+    authorize: record('authorize'),
+    openSetting: record('openSetting', { authSetting: {} }),
+    getPrivacySetting: record('getPrivacySetting', { needAuthorization: false }),
+    requirePrivacyAuthorize: record('requirePrivacyAuthorize'),
+    openPrivacyContract: record('openPrivacyContract'),
+    setClipboardData: record('setClipboardData'),
+    createMapContext: (id) => {
+      calls.push({ name: 'createMapContext', opts: id });
+      return {
+        includePoints: (o) => calls.push({ name: 'map.includePoints', opts: o }),
+        moveToLocation: (o) => calls.push({ name: 'map.moveToLocation', opts: o }),
+        getCenterLocation: record('map.getCenterLocation'),
+      };
+    },
   };
 }
 

@@ -1,0 +1,4 @@
+{
+  "read": "doc.hostOpenid == auth.openid",
+  "write": false
+}

@@ -1,0 +1,5 @@
+<view class="container">
+  <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
+  <view class="empty">「��还在建设中</view>
+</view>
+<privacy-popup id="privacy-popup" />

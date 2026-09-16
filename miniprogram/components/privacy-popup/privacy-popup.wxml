@@ -1,0 +1,19 @@
+<view wx:if="{{visible}}" class="pp-mask" catchtouchmove="noop">
+  <view class="pp-sheet">
+    <view class="pp-title">隐私保护指引</view>
+    <view class="pp-body">
+      使用签到、附带位置或上传照片前,请先阅读并同意
+      <text class="pp-link" bindtap="onOpenContract">{{contractName}}</text>。
+      我们只在你主动操作时使用对应权限,签到坐标只用于校验、不会保存。
+    </view>
+    <view class="pp-btns">
+      <button class="btn-ghost pp-btn" bindtap="onReject">不同意</button>
+      <button
+        id="privacy-agree-btn"
+        class="btn-primary pp-btn"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onAgree"
+      >同意并继续</button>
+    </view>
+  </view>
+</view>

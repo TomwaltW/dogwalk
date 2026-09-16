@@ -1,19 +1,44 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/spot/spot",
+    "pages/park/park",
     "pages/checkin/checkin",
     "pages/dog/edit/edit",
+    "pages/dog/tag/tag",
     "pages/dog/profile/profile",
+    "pages/walk/list/list",
+    "pages/walk/create/create",
+    "pages/walk/detail/detail",
     "pages/me/me"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "遛狗",
-    "backgroundColor": "#f6f6f6",
+    "backgroundColor": "#f7f5f2",
     "backgroundTextStyle": "light"
   },
+  "tabBar": {
+    "color": "#8a8a8a",
+    "selectedColor": "#ff8a3d",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "公园" },
+      { "pagePath": "pages/walk/list/list", "text": "约遛" },
+      { "pagePath": "pages/me/me", "text": "我的" }
+    ]
+  },
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于校验你是否在公园范围内完成签到,以及路人自愿附带走失狗的发现位置"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation"],
+  "__usePrivacyCheck__": true,
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"

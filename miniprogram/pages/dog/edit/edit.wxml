@@ -119,3 +119,4 @@
     <button wx:if="{{!isNew}}" class="danger" bindtap="onRemove">删除这只狗</button>
   </view>
 </view>
+<privacy-popup id="privacy-popup" />

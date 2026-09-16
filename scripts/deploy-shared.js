@@ -5,7 +5,8 @@
  * 路径差异是这样来的:
  *   仓库里   cloudfunctions/<fn>/core.js 写 require('../_shared/errors')  —— 本地测试能 resolve
  *   部署后   函数包的根就是 <fn>/ 本身,'../' 已经在包外  —— 必须改成 './_shared/errors'
- * 约定(spec 3.3.1):core.js 一律写 '../_shared/xxx',由本脚本负责重写。
+ * 约定(spec 3.3.1):core.js / index.js 一律写 '../_shared/xxx',由本脚本负责重写;
+ * _shared 的 require 只许出现在这两个文件里。
  *
  * 两种模式:
  *   默认(--dist)      产出到 dist/cloudfunctions/<fn>/,仓库源文件一行不动。
@@ -111,20 +112,23 @@ function main() {
 
     copyDir(SHARED, path.join(target, '_shared'));
 
-    const core = path.join(target, 'core.js');
-    const rewritten = fs.existsSync(core) ? rewriteSharedRequire(core) : false;
+    // 只重写 core.js 与 index.js 两个文件(spec 3.3.1):_shared 的 require 只许出现在这两处
+    const rewritten = ['core.js', 'index.js'].filter((f) => {
+      const file = path.join(target, f);
+      return fs.existsSync(file) && rewriteSharedRequire(file);
+    });
 
     console.log(
       '  ' +
         fn +
         ' -> ' +
         path.relative(ROOT, target) +
-        (rewritten ? '  (core.js 路径已重写)' : '')
+        (rewritten.length ? '  (' + rewritten.join(' / ') + ' 路径已重写)' : '')
     );
   });
 
   if (args.inPlace) {
-    console.log('\n注意: --in-place 改写了 cloudfunctions/*/core.js,上传完请 git checkout 还原。');
+    console.log('\n注意: --in-place 改写了 cloudfunctions/*/{core,index}.js,上传完请 git checkout 还原。');
   } else {
     console.log('\n上传时把 ' + path.relative(ROOT, DIST) + '/<fn> 当作云函数根目录。');
   }

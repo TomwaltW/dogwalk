@@ -1,0 +1,20 @@
+.pp-mask {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+.pp-sheet {
+  width: 100%;
+  background: var(--c-card, #fff);
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 40rpx 32rpx calc(40rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.pp-title { font-size: 34rpx; font-weight: 600; margin-bottom: 20rpx; }
+.pp-body { font-size: 28rpx; line-height: 1.7; color: var(--c-text, #1f1f1f); margin-bottom: 32rpx; }
+.pp-link { color: var(--c-primary, #ff8a3d); }
+.pp-btns { display: flex; gap: 20rpx; }
+.pp-btn { flex: 1; margin: 0; }

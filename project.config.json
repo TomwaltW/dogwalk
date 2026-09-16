@@ -1,0 +1,34 @@
+{
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "dist/cloudfunctions/",
+  "appid": "<<填小程序AppID>>",
+  "projectname": "dogwalk",
+  "compileType": "miniprogram",
+  "libVersion": "3.0.0",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false,
+    "coverView": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "ignoreUploadUnusedFiles": true,
+    "checkInvalidKey": true,
+    "compileHotReLoad": true,
+    "packNpmManually": false,
+    "useStaticServer": false,
+    "useLanDebug": false
+  },
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "tests" },
+      { "type": "folder", "value": "docs" },
+      { "type": "folder", "value": "scripts" },
+      { "type": "folder", "value": "database" },
+      { "type": "folder", "value": "node_modules" }
+    ],
+    "include": []
+  }
+}

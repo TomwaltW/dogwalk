@@ -1,4 +1,5 @@
 {
-  "navigationBarTitleText": "我出门了",
-  "usingComponents": {}
+  "navigationBarTitleText": "签到",
+  "usingComponents": {},
+  "enablePullDownRefresh": true
 }
