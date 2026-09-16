@@ -1,5 +1,45 @@
+<!-- 狗卡片:公园页里「此刻在场」和「今天来过」两处共用,只显示 DogCard 的字段 -->
+<template name="dogCard">
+  <view class="dog">
+    <image wx:if="{{avatarFileID}}" class="avatar" src="{{avatarFileID}}" mode="aspectFill" />
+    <view wx:else class="avatar avatar-blank">🐶</view>
+    <view class="dog-text">
+      <view class="dog-name">{{name}}</view>
+      <view class="muted sub">{{sizeText}}{{tagsText ? ' · ' + tagsText : ''}}</view>
+    </view>
+  </view>
+</template>
+
 <view class="container">
   <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+
+  <view wx:if="{{park}}" class="card head">
+    <view class="park-name">{{park.name}}</view>
+    <view class="muted">此刻在场 {{park.activeDogCount}} 只狗</view>
+
+    <view wx:if="{{myCheckin}}" class="mine">
+      <text class="mine-text">在场中,{{expireText}} 前有效</text>
+      <button class="btn-ghost btn-sm" bindtap="onCancel">签退</button>
+    </view>
+    <button wx:else class="btn-primary btn-wide" bindtap="onCheckin">签到</button>
+
+    <button class="btn-ghost btn-wide" bindtap="onCreateWalk">在这发起约遛</button>
+  </view>
+
+  <view wx:if="{{loading && !park}}" class="empty">加载中…</view>
+
+  <block wx:if="{{park}}">
+    <view class="section-title">此刻在场</view>
+    <view wx:if="{{emptyText}}" class="empty">{{emptyText}}</view>
+    <view wx:else class="card list">
+      <template wx:for="{{dogs}}" wx:key="dogId" is="dogCard" data="{{...item}}" />
+    </view>
+
+    <view class="section-title">今天来过</view>
+    <view wx:if="{{todayEmptyText}}" class="empty">{{todayEmptyText}}</view>
+    <view wx:else class="card list">
+      <template wx:for="{{todayDogs}}" wx:key="dogId" is="dogCard" data="{{...item}}" />
+    </view>
+  </block>
 </view>
 <privacy-popup id="privacy-popup" />

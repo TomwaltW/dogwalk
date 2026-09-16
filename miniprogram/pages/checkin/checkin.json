@@ -1,5 +1,5 @@
 {
   "navigationBarTitleText": "签到",
   "usingComponents": {},
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": false
 }

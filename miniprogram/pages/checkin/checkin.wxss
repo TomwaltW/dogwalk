@@ -1,1 +1,45 @@
 /* miniprogram/pages/checkin/checkin.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+
+.banner-err {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.btn-sm {
+  font-size: 24rpx;
+  line-height: 2;
+  padding: 0 24rpx;
+  margin: 0 0 0 20rpx;
+  flex-shrink: 0;
+}
+
+.list { padding-top: 8rpx; padding-bottom: 8rpx; }
+
+.dog {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid var(--c-line);
+}
+.dog:last-child { border-bottom: none; }
+
+.dog-text { flex: 1; margin-left: 20rpx; min-width: 0; }
+.dog-name { font-size: 30rpx; font-weight: 500; }
+.sub { font-size: 24rpx; }
+
+.dog-on .dog-name { color: var(--c-primary-deep); }
+.tick {
+  color: var(--c-primary);
+  font-size: 34rpx;
+  width: 40rpx;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tip {
+  font-size: 24rpx;
+  margin: 24rpx 0;
+  line-height: 1.7;
+}
+
+.btn-wide { width: 100%; }

@@ -1,5 +1,38 @@
 <view class="container">
-  <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+  <view wx:if="{{errMsg}}" class="banner-err">
+    <text>{{errMsg}}</text>
+    <button wx:if="{{needSetting}}" class="btn-ghost btn-sm" bindtap="onOpenSetting">去设置</button>
+  </view>
+
+  <view class="section-title">带哪几只狗</view>
+
+  <view wx:if="{{loading}}" class="empty">加载中…</view>
+  <view wx:elif="{{emptyText}}" class="empty">{{emptyText}}</view>
+
+  <view wx:else class="card list">
+    <view
+      wx:for="{{dogs}}"
+      wx:key="dogId"
+      class="dog {{item.selected ? 'dog-on' : ''}}"
+      data-dog-id="{{item.dogId}}"
+      bindtap="onToggleDog"
+    >
+      <image wx:if="{{item.avatarFileID}}" class="avatar" src="{{item.avatarFileID}}" mode="aspectFill" />
+      <view wx:else class="avatar avatar-blank">🐶</view>
+      <view class="dog-text">
+        <view class="dog-name">{{item.name}}</view>
+        <view class="muted sub">{{item.sizeText}}{{item.tagsText ? ' · ' + item.tagsText : ''}}</view>
+      </view>
+      <text class="tick">{{item.selected ? '✓' : ''}}</text>
+    </view>
+  </view>
+
+  <view class="muted tip">{{tipText}}</view>
+
+  <button
+    class="btn-primary btn-wide"
+    disabled="{{submitting || dogs.length === 0}}"
+    bindtap="onSubmit"
+  >{{submitting ? '签到中…' : '签到'}}</button>
 </view>
 <privacy-popup id="privacy-popup" />
