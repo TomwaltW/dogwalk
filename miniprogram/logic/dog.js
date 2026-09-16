@@ -1,31 +1,38 @@
 /**
- * miniprogram/logic/dog.js —— owner: T1
+ * miniprogram/logic/dog.js —— owner: T6
  *
  * 狗档案的前端纯逻辑:本地校验 + 年龄展示。无副作用、不碰 wx.*、不调 api,
- * 页面(T5 的 pages/dog/**)提交前先过这里,拦得下的就不发请求。
+ * 页面(T9 的 pages/dog/**)提交前先过这里,拦得下的就不发请求。
  *
  * 与云端的关系:
- *   - 这不是 cloudfunctions/_shared/schema.js。那是云端契约签名,本轮未实现;
- *     云端校验各自写在云函数的 core.js 里。两边规则一致,口径见下方注释。
- *   - 前端拦截只是省一次往返,**不是**安全边界,云端照样全量校验一遍。
- *
- * 枚举为什么在这里再抄一份:小程序只打包 miniprogram/ 根内的文件,
- * require('../../cloudfunctions/...') 在真机上 resolve 不到
- * (同 api/index.js 里 INTERNAL 那段注释)。取值必须与 _shared/contracts.js
- * 一致,tests/logic/dog.test.js 有一条用例逐项钉死,改一边会红。
+ *   - 规则与 cloudfunctions/dogCRUD/core.js 的 validateDog 一致,但那份才是边界;
+ *     这份只为省一次往返,云端照样全量校验一遍。
+ *   - 枚举从 ./enums 取(T0' 提供的契约镜像,tests/shared/enums.test.js 已钉死
+ *     它与 cloudfunctions/_shared/contracts.js 一致),不再在这里抄第二份。
+ *     小程序只打包 miniprogram/ 根内的文件,跨根 require 在真机上 resolve 不到,
+ *     所以只能取镜像,不能直接 require contracts.js。
  */
 
-const SIZE_CLASS = ['small', 'medium', 'large'];
-const PLAY_STYLE = ['chase', 'wrestle', 'solo'];
-const TEMPERAMENT = ['friendly', 'shy', 'jumpy', 'antisocial'];
-const GENDER = ['male', 'female'];
+const { SIZE_CLASS, GENDER, TAGS, LIMITS, charLength } = require('./enums');
 
-const NAME_MAX = 12; // spec 3.2:name 1-12 字符
+const NAME_MAX = LIMITS.NAME_MAX; // spec 3.2.2:name 1-12 字符(按码位数)
 const BIRTH_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/; // 'YYYY-MM'
+
+/** 各文本字段的长度上限,按码位数比 */
+const TEXT_MAX = {
+  breed: LIMITS.BREED_MAX,
+  licenseNo: LIMITS.LICENSE_MAX,
+  lostNote: LIMITS.LOST_NOTE_MAX,
+};
+
+const BOOL_FIELDS = ['neutered', 'vaccinated', 'lostMode'];
 
 /**
  * 新建表单的初始值:枚举字段先给好默认,名字留空待填。
  * 直接丢给 validateDog() 会得到 'name' —— 空表单本来就不该能提交。
+ *
+ * 刻意不含 lostMode / lostNote:走失开关在身份牌页(api.setLostMode),
+ * 档案表单带上它们就会在保存档案时顺手把走失模式关掉。
  *
  * @returns {object} 一只字段齐全的空狗
  */
@@ -37,11 +44,10 @@ function emptyDog() {
     birthMonth: '',
     gender: 'male',
     neutered: false,
+    vaccinated: false,
+    licenseNo: '',
+    tags: [],
     avatarFileID: '',
-    playStyle: [],
-    temperament: [],
-    okWithSmallDogs: true,
-    socialOk: true,
   };
 }
 
@@ -56,13 +62,14 @@ function isSubsetOf(v, allowed) {
 
 /**
  * 校验狗档案。规则与 cloudfunctions/dogCRUD/core.js 保持一致:
- *   name        去空格后 1-12 字符
+ *   name        去空格后 1-12 字符(按码位数)
  *   sizeClass   ∈ SIZE_CLASS
  *   gender      ∈ GENDER
  *   birthMonth  '' 或 'YYYY-MM'
- *   breed / avatarFileID        String
- *   playStyle / temperament     各自枚举的子集
- *   neutered / okWithSmallDogs / socialOk / lostMode   Boolean
+ *   breed / licenseNo / lostNote   String,且各自不超长
+ *   avatarFileID                   String
+ *   tags                           TAGS 的子集
+ *   neutered / vaccinated / lostMode   Boolean
  *
  * 全量模式(partial 非 true)下必填的只有 name / sizeClass / gender ——
  * 其余字段缺省时由云端补默认值,不算用户填错。
@@ -78,7 +85,7 @@ function validateDog(dog, opts) {
 
   if (has('name')) {
     if (typeof dog.name !== 'string') return 'name';
-    const n = dog.name.trim().length;
+    const n = charLength(dog.name.trim());
     if (n < 1 || n > NAME_MAX) return 'name';
   } else if (!partial) {
     return 'name';
@@ -99,13 +106,12 @@ function validateDog(dog, opts) {
   if (has('birthMonth') && !(dog.birthMonth === '' || BIRTH_MONTH_RE.test(dog.birthMonth))) {
     return 'birthMonth';
   }
-  if (has('breed') && typeof dog.breed !== 'string') return 'breed';
+  for (const k of Object.keys(TEXT_MAX)) {
+    if (has(k) && (typeof dog[k] !== 'string' || charLength(dog[k]) > TEXT_MAX[k])) return k;
+  }
   if (has('avatarFileID') && typeof dog.avatarFileID !== 'string') return 'avatarFileID';
-  if (has('playStyle') && !isSubsetOf(dog.playStyle, PLAY_STYLE)) return 'playStyle';
-  if (has('temperament') && !isSubsetOf(dog.temperament, TEMPERAMENT)) return 'temperament';
-
-  const bools = ['neutered', 'okWithSmallDogs', 'socialOk', 'lostMode'];
-  for (const k of bools) {
+  if (has('tags') && !isSubsetOf(dog.tags, TAGS)) return 'tags';
+  for (const k of BOOL_FIELDS) {
     if (has(k) && typeof dog[k] !== 'boolean') return k;
   }
 
@@ -151,9 +157,9 @@ function formatAge(birthMonth, now) {
 
 module.exports = {
   SIZE_CLASS,
-  PLAY_STYLE,
-  TEMPERAMENT,
   GENDER,
+  TAGS,
+  LIMITS,
   NAME_MAX,
   emptyDog,
   validateDog,

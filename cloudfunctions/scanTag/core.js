@@ -1,11 +1,15 @@
-// cloudfunctions/scanTag/core.js —— owner: T3
+// cloudfunctions/scanTag/core.js —— owner: T6
 // _shared 一律走 '../_shared/xxx';部署时由 scripts/deploy-shared.js 重写为 './_shared/xxx'。
+// 注意该脚本只重写 core.js,所以 _shared 的 require 只能出现在本文件里,不要拆文件。
 //
 // spec 3.3.2
 // event: { tagCode: String }
-// data:  DogPublic —— 字段只能少不能多,见 spec 3.2「公开视图」
-// 允许游客(ctx.openid === '')调用,这是 AUTH_REQUIRED 的唯一例外。
-// ownerContact 仅当 lostMode === true 时非 null;每次扫码写一条 scanLogs。
+// data:  DogPublic —— 恰好 9 个 key,见 spec 3.2.3
+// 允许游客(ctx.openid === '')调用,这是 AUTH_REQUIRED 的例外之一(spec 3.4)。
+//
+// 这里不读 users,也不返回任何主人信息:spec 9 节假设 12 —— 走失页不显示主人联系方式,
+// 路人只能留言(reportFound),主人靠订阅消息与身份牌页的留言列表看到。
+// 每次扫码写一条 scanLogs。
 
 const { COLL, TAG_CODE_LENGTH } = require('../_shared/contracts');
 const { ok, fail, CODES } = require('../_shared/errors');
@@ -14,55 +18,33 @@ const { ok, fail, CODES } = require('../_shared/errors');
 const TAG_CODE_RE = new RegExp('^[a-z0-9]{' + TAG_CODE_LENGTH + '}$');
 
 /**
- * 走失态下主人的联系方式 —— 来源字段待定,见 SPEC 3.2 的 DogPublic。
+ * dogs 文档 → DogPublic(spec 3.2.3)。字段逐个挑,恰好 9 个,只能少不能多:
+ * _id / ownerOpenid / tagCode / qrFileID / licenseNo / neutered / vaccinated /
+ * createdAt / updatedAt 一律不出去。
  *
- * spec 3.2 的 users / dogs 两张字段表里没有任何可以当联系方式的字段,
- * spec 1 又写明「不做实名认证、不做手机号获取」,所以本轮无法取到真实来源。
- * 补契约是总管的事,T3 只把接缝留好:门控逻辑照写照测,函数体先返回 null。
- * 将来来源字段补齐后,只改这一个函数体,调用处与测试都不用动。
- *
- * @param {object} dog   dogs 文档
- * @param {object} owner users 文档(走失态才会读,读不到时为 null)
- * @returns {string|null}
- */
-function resolveOwnerContact(dog, owner) {
-  return null;
-}
-
-/**
- * dogs 文档 → DogPublic。字段逐个挑,只能少不能多(spec 3.2):
- * _id / ownerOpenid / tagCode / socialOk / qrFileID / createdAt / updatedAt 一律不出去。
+ * lostNote 只在走失态下给 —— 非走失态恒为空串,库里存着上次走失的留言也不给路人看。
  *
  * @param {object} dog
- * @param {object|null} owner
  * @returns {object} DogPublic
  */
-function toDogPublic(dog, owner) {
+function toDogPublic(dog) {
+  const lostMode = !!dog.lostMode;
   return {
     name: typeof dog.name === 'string' ? dog.name : '',
     breed: typeof dog.breed === 'string' ? dog.breed : '',
-    sizeClass: dog.sizeClass,
+    sizeClass: typeof dog.sizeClass === 'string' ? dog.sizeClass : '',
+    gender: typeof dog.gender === 'string' ? dog.gender : '',
     birthMonth: typeof dog.birthMonth === 'string' ? dog.birthMonth : '',
-    gender: dog.gender,
-    neutered: !!dog.neutered,
     avatarFileID: typeof dog.avatarFileID === 'string' ? dog.avatarFileID : '',
-    playStyle: Array.isArray(dog.playStyle) ? dog.playStyle.slice() : [],
-    temperament: Array.isArray(dog.temperament) ? dog.temperament.slice() : [],
-    okWithSmallDogs: !!dog.okWithSmallDogs,
-    lostMode: !!dog.lostMode,
-    ownerContact: dog.lostMode ? resolveOwnerContact(dog, owner) : null,
+    tags: Array.isArray(dog.tags) ? dog.tags.slice() : [],
+    lostMode,
+    lostNote: lostMode && typeof dog.lostNote === 'string' ? dog.lostNote : '',
   };
 }
 
 /**
  * @param {object} event                云函数入参
- * @param {object} ctx
- * @param {object} ctx.db               云开发 db 实例(测试时为 fake-db)
- * @param {object} ctx._                db.command
- * @param {string} ctx.openid           调用者 openid,游客为 ''
- * @param {() => Date} ctx.now          取当前时间,禁止直接 new Date()
- * @param {object} ctx.openapi          cloud.openapi,测试时为 mock
- * @param {{info:Function,error:Function}} ctx.logger
+ * @param {object} ctx                  见 spec 3.3.1
  * @returns {Promise<{ok:true,data:any}|{ok:false,code:string,msg:string}>}
  */
 module.exports = async function core(event, ctx) {
@@ -78,17 +60,7 @@ module.exports = async function core(event, ctx) {
   const dog = found.data[0];
   if (!dog) return fail(CODES.NOT_FOUND, COLL.DOGS);
 
-  // 主人资料只在走失态下才需要,非走失态不白读一次 users。
-  let owner = null;
-  if (dog.lostMode) {
-    try {
-      owner = (await db.collection(COLL.USERS).doc(dog.ownerOpenid).get()).data;
-    } catch {
-      owner = null; // 主人文档不在了也不该让扫码失败
-    }
-  }
-
-  // spec 3.2 scanLogs:游客态 scannerOpenid 写空串,不是 null / undefined。
+  // spec 3.2.2 scanLogs:游客态 scannerOpenid 写空串,不是 null / undefined。
   await db.collection(COLL.SCAN_LOGS).add({
     data: {
       tagCode,
@@ -98,8 +70,5 @@ module.exports = async function core(event, ctx) {
     },
   });
 
-  return ok(toDogPublic(dog, owner));
+  return ok(toDogPublic(dog));
 };
-
-// 接缝对外可见,便于总管补完来源字段后一处改完,也便于测试直接引用当下口径。
-module.exports.resolveOwnerContact = resolveOwnerContact;

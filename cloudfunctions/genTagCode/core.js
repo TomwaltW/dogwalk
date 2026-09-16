@@ -1,10 +1,11 @@
-// cloudfunctions/genTagCode/core.js —— owner: T3
+// cloudfunctions/genTagCode/core.js —— owner: T6
 // _shared 一律走 '../_shared/xxx';部署时由 scripts/deploy-shared.js 重写为 './_shared/xxx'。
+// 注意该脚本只重写 core.js,所以 _shared 的 require 只能出现在本文件里,不要拆文件。
 //
 // spec 3.3.2
 // event: { dogId: String }
 // data:  { tagCode: String, qrFileID: String }
-// tagCode 长度为 TAG_CODE_LENGTH 的 [a-z0-9],全局唯一;已生成过则复用,不新建。
+// tagCode 长度为 TAG_CODE_LENGTH 的 [a-z0-9],全局唯一;已生成过则复用,不重摇也不重传。
 
 const { COLL, TAG_CODE_LENGTH } = require('../_shared/contracts');
 const { ok, fail, CODES } = require('../_shared/errors');
@@ -13,6 +14,8 @@ const { ok, fail, CODES } = require('../_shared/errors');
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 // 撞码重摇的上限。36^6 ≈ 22 亿,一个小区的狗量下撞满 12 次等于库坏了。
 const MAX_TRIES = 12;
+// 小程序码扫出来落到哪一页(spec 3.3.2)。这一页是游客可见的寻回页。
+const QR_PAGE = 'pages/dog/profile/profile';
 
 /** 随机一个短码。云函数里可以用 Math.random(),spec 3.3.4 那条禁令只约束页面。 */
 function randomCode() {
@@ -41,13 +44,13 @@ async function pickUniqueCode(db) {
 }
 
 /**
- * 生成狗牌小程序码,拿到云存储 fileID。
+ * 生成狗牌小程序码并落进云存储,拿到 fileID。
  *
- * 接缝说明:ctx(spec 3.3.1)里只有 openapi,没有云存储句柄;而云调用
- * wxacode.getUnlimited 返回的是 { contentType, buffer },要落成 fileID 还需要
- * cloud.uploadFile。所以这里只在返回值里现成带 fileID 时采用,否则留空串
- * ——spec 3.2 允许 qrFileID 为 '',spec 3.4 也要求 openapi 失败不影响主流程。
- * 总管给 ctx 补上存储句柄后,改这一个函数体即可。
+ * wxacode.getUnlimited 返回的是 { buffer, contentType },要变成能在 <image> 里显示的
+ * fileID 还得过一次 ctx.storage.uploadFile(spec 3.3.1)。
+ *
+ * spec 3.4:openapi / 云存储任一环节出错都只记 logger.error,qrFileID 留空串,
+ * 主流程仍返回 ok —— dogs.qrFileID 允许为 ''(spec 3.2.2),下次进身份牌页会再试一次。
  *
  * @param {string} tagCode
  * @param {object} ctx
@@ -61,30 +64,21 @@ async function makeQrFileID(tagCode, ctx) {
     return '';
   }
   try {
-    const res = await wxacode.getUnlimited({
-      scene: tagCode,
-      page: 'pages/dog/profile/profile',
-      checkPath: false,
-    });
-    if (res && typeof res.fileID === 'string' && res.fileID) return res.fileID;
-    logger.error('genTagCode: 小程序码没带回 fileID,qrFileID 留空', { tagCode });
-    return '';
+    const res = await wxacode.getUnlimited({ scene: tagCode, page: QR_PAGE, checkPath: false });
+    if (!res || !res.buffer) {
+      logger.error('genTagCode: 小程序码没带回 buffer,qrFileID 留空', { tagCode });
+      return '';
+    }
+    return await ctx.storage.uploadFile('tags/' + tagCode + '.png', res.buffer);
   } catch (e) {
-    // spec 3.4:openapi 失败记 logger.error,不影响主流程返回 ok
-    logger.error('genTagCode: 生成小程序码失败', { tagCode, msg: e && e.message });
+    logger.error('genTagCode: 生成或上传小程序码失败', { tagCode, msg: e && e.message });
     return '';
   }
 }
 
 /**
  * @param {object} event                云函数入参
- * @param {object} ctx
- * @param {object} ctx.db               云开发 db 实例(测试时为 fake-db)
- * @param {object} ctx._                db.command
- * @param {string} ctx.openid           调用者 openid,游客为 ''
- * @param {() => Date} ctx.now          取当前时间,禁止直接 new Date()
- * @param {object} ctx.openapi          cloud.openapi,测试时为 mock
- * @param {{info:Function,error:Function}} ctx.logger
+ * @param {object} ctx                  见 spec 3.3.1
  * @returns {Promise<{ok:true,data:any}|{ok:false,code:string,msg:string}>}
  */
 module.exports = async function core(event, ctx) {
@@ -104,12 +98,12 @@ module.exports = async function core(event, ctx) {
   if (!dog) return fail(CODES.NOT_FOUND, COLL.DOGS);
   if (dog.ownerOpenid !== ctx.openid) return fail(CODES.FORBIDDEN);
 
-  // 已生成过就复用已有的,不新建(spec 6 节 T3)。
+  // 已生成过就复用已有的,不新建 —— 身份牌是印出来贴狗身上的,换码等于旧牌作废。
   const oldCode = typeof dog.tagCode === 'string' ? dog.tagCode : '';
   const tagCode = oldCode || (await pickUniqueCode(db));
   if (!tagCode) return fail(CODES.INTERNAL, 'tagCode generate failed');
 
-  // 码同理:已有就不重新生成,只有缺的时候才去调 openapi。
+  // 码同理:已有就不重新生成,只有缺的时候才去调 openapi + 上传。
   const oldQr = typeof dog.qrFileID === 'string' ? dog.qrFileID : '';
   const qrFileID = oldQr || (await makeQrFileID(tagCode, ctx));
 
