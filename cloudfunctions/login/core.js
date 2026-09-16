@@ -1,23 +1,21 @@
-// cloudfunctions/login/core.js —— owner: T1
+// cloudfunctions/login/core.js —— owner: T6
 // _shared 一律走 '../_shared/xxx';部署时由 scripts/deploy-shared.js 重写为 './_shared/xxx'。
 // 注意该脚本只重写 core.js,所以 _shared 的 require 只能出现在本文件里,不要拆文件。
 //
 // spec 3.3.2
 // event: { profile?: { nickname: String, avatarFileID: String } }
 // data:  { user: User, dogs: [Dog] }
-// 首次调用创建 users 文档(_id 即 _openid);二次调用不重复创建。
+// 首次调用创建 users 文档(_id 即 _openid);二次调用不重复创建,也不动两本账
+// (subQuota / subTemplates,见 spec 3.2.2)。
 // ctx.openid === '' → fail(AUTH_REQUIRED)
 
 const { COLL } = require('../_shared/contracts');
 const { CODES, fail, ok } = require('../_shared/errors');
 
-const NICKNAME_MAX = 20; // _shared/schema.js 的 validateProfile 口径:nickname 1-20 字符
+const NICKNAME_MAX = 20; // 微信昵称上限口径,与前端保持一致
 
 /**
- * 校验 login 带上来的用户资料。
- *
- * 本该调 _shared/schema.js 的 validateProfile,但它本轮是 NOT_IMPLEMENTED
- * 且属 T0 只读,所以按同一套约定(通过返回 null,失败返回字段名)就地实现。
+ * 校验 login 带上来的用户资料。通过返回 null,失败返回字段名。
  *
  * @param {object} [profile]  { nickname, avatarFileID };缺省视为通过
  * @returns {string|null} 出错字段名,通过则 null
@@ -48,13 +46,7 @@ function profilePatch(profile) {
 
 /**
  * @param {object} event                云函数入参
- * @param {object} ctx
- * @param {object} ctx.db               云开发 db 实例(测试时为 fake-db)
- * @param {object} ctx._                db.command
- * @param {string} ctx.openid           调用者 openid,游客为 ''
- * @param {() => Date} ctx.now          取当前时间,禁止直接 new Date()
- * @param {object} ctx.openapi          cloud.openapi,测试时为 mock
- * @param {{info:Function,error:Function}} ctx.logger
+ * @param {object} ctx                  见 spec 3.3.1
  * @returns {Promise<{ok:true,data:any}|{ok:false,code:string,msg:string}>}
  */
 module.exports = async function core(event, ctx) {
@@ -71,7 +63,7 @@ module.exports = async function core(event, ctx) {
     const now = ctx.now();
     const patch = profilePatch(e.profile);
 
-    // users 的 _id 即 _openid(spec 3.2)。doc(id).get() 在文档不存在时是
+    // users 的 _id 即 _openid(spec 3.2.2)。doc(id).get() 在文档不存在时是
     // reject 而不是 resolve(null),所以判存在走 where 更省事。
     const found = await users.where({ _openid: openid }).get();
     let user = found.data[0];
@@ -82,8 +74,8 @@ module.exports = async function core(event, ctx) {
           _openid: openid,
           nickname: '',
           avatarFileID: '',
-          followSpotIds: [],
           subQuota: {},
+          subTemplates: {},
           status: 'normal',
           createdAt: now,
           updatedAt: now,
@@ -93,7 +85,8 @@ module.exports = async function core(event, ctx) {
       await users.doc(openid).set({ data: doc });
       user = Object.assign({ _id: openid }, doc);
     } else if (Object.keys(patch).length) {
-      // 二次调用只覆盖 profile 带来的字段,createdAt / followSpotIds / subQuota 原样保留
+      // 二次调用只覆盖 profile 带来的字段;createdAt 与两本账(subQuota /
+      // subTemplates)原样保留 —— 额度是用户一次次授权攒下来的,登录不该清零。
       patch.updatedAt = now;
       await users.doc(user._id).update({ data: patch });
       user = Object.assign(user, patch);
