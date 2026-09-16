@@ -1,3 +1,42 @@
 <view class="container">
-  <text class="muted">狗主页</text>
+  <view wx:if="{{loading}}" class="muted">读取狗牌中…</view>
+
+  <view wx:elif="{{errMsg}}" class="empty">
+    <text class="err">{{errMsg}}</text>
+    <text class="muted tip">下拉可以再试一次</text>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{dog.lostMode}}" class="lost">
+      这只狗正在走失中,看到它请联系主人
+    </view>
+
+    <view class="head">
+      <image
+        wx:if="{{dog.avatarFileID}}"
+        class="avatar"
+        src="{{dog.avatarFileID}}"
+        mode="aspectFill"
+        bindtap="onPreviewAvatar"
+      />
+      <view wx:else class="avatar placeholder">🐶</view>
+      <view class="name">{{dog.name}}</view>
+      <view class="muted sub">{{dog.breed}}</view>
+    </view>
+
+    <view class="card">
+      <view class="line"><text class="k">体型</text><text class="v">{{view.sizeClassText}}</text></view>
+      <view class="line"><text class="k">性别</text><text class="v">{{view.genderText}} · {{view.neuteredText}}</text></view>
+      <view wx:if="{{dog.birthMonth}}" class="line"><text class="k">出生</text><text class="v">{{dog.birthMonth}}</text></view>
+      <view wx:if="{{view.playStyleText}}" class="line"><text class="k">玩法</text><text class="v">{{view.playStyleText}}</text></view>
+      <view wx:if="{{view.temperamentText}}" class="line"><text class="k">性格</text><text class="v">{{view.temperamentText}}</text></view>
+      <view class="line"><text class="k">小型犬</text><text class="v">{{view.okWithSmallDogsText}}</text></view>
+    </view>
+
+    <button wx:if="{{canContact}}" class="primary" bindtap="onContactOwner">联系主人</button>
+
+    <view wx:if="{{isGuest}}" class="muted tip">
+      你现在是游客,档案随便看;想给自己的狗也挂个牌,去「我的」登录就行
+    </view>
+  </block>
 </view>

@@ -1,3 +1,37 @@
 <view class="container">
-  <text class="muted">我的</text>
+  <view class="head">
+    <block wx:if="{{logged}}">
+      <image wx:if="{{user.avatarFileID}}" class="avatar" src="{{user.avatarFileID}}" mode="aspectFill" />
+      <view class="nickname">{{user.nickname}}</view>
+    </block>
+    <button wx:else class="primary" bindtap="onLogin">登录</button>
+  </view>
+
+  <view wx:if="{{errMsg}}" class="err banner">{{errMsg}}</view>
+
+  <view class="section">
+    <view class="section-head">
+      <text>我的狗</text>
+      <text class="add" bindtap="onAddDog">+ 加一只</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <view wx:elif="{{dogs.length === 0}}" class="muted empty">还没有狗,点右上角加一只</view>
+
+    <view wx:for="{{dogs}}" wx:key="_id" class="dog">
+      <view class="dog-main" data-dog-id="{{item._id}}" bindtap="onEditDog">
+        <image wx:if="{{item.avatarFileID}}" class="thumb" src="{{item.avatarFileID}}" mode="aspectFill" />
+        <view wx:else class="thumb placeholder">🐶</view>
+        <view class="dog-text">
+          <view class="dog-name">{{item.name}}</view>
+          <view class="muted sub">{{item.sizeClassText}} · {{item.genderText}}{{item.temperamentText ? ' · ' + item.temperamentText : ''}}</view>
+        </view>
+      </view>
+      <text
+        class="link {{item.hasTag ? '' : 'off'}}"
+        data-tag-code="{{item.tagCode}}"
+        bindtap="onViewPublic"
+      >{{item.hasTag ? '看狗牌页' : '未生成狗牌'}}</text>
+    </view>
+  </view>
 </view>

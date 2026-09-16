@@ -1,3 +1,44 @@
 <view class="container">
-  <text class="muted">我出门了</text>
+  <view wx:if="{{errMsg}}" class="err banner">{{errMsg}}</view>
+
+  <view class="block">
+    <text class="label">带哪几只出门</text>
+
+    <view wx:if="{{loading && !dogs.length}}" class="muted state">加载中…</view>
+    <view wx:elif="{{!dogs.length && !errMsg}}" class="muted state">
+      还没有狗档案,先去「我的」添一只
+    </view>
+
+    <view class="dog-list">
+      <view
+        wx:for="{{dogs}}"
+        wx:key="_id"
+        class="dog {{item.selected ? 'dog-on' : ''}}"
+        data-dog-id="{{item._id}}"
+        bindtap="toggleDog"
+      >
+        <image wx:if="{{item.avatarFileID}}" class="dog-avatar" src="{{item.avatarFileID}}" mode="aspectFill" />
+        <view wx:else class="dog-avatar"></view>
+        <text class="dog-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="block">
+    <text class="label">留一句话(可不填)</text>
+    <input
+      class="note"
+      value="{{note}}"
+      maxlength="{{noteMax}}"
+      placeholder="比如:在滑梯旁边,带球来的"
+      bindinput="onNoteInput"
+    />
+    <text class="muted counter">{{note.length}}/{{noteMax}}</text>
+  </view>
+
+  <text class="muted hint">发出去之后 90 分钟内有效,关注这个点位的人会收到提醒。</text>
+
+  <button class="cta" type="primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">
+    我出门了
+  </button>
 </view>

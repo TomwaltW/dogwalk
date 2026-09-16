@@ -1,3 +1,34 @@
 <view class="container">
-  <text class="muted">首页</text>
+  <view class="head">
+    <view class="head-main">
+      <text class="title">今天谁在遛狗</text>
+      <text class="muted sub">选一个点位,看看这会儿有谁在</text>
+    </view>
+    <text class="link" bindtap="goMe">我的</text>
+  </view>
+
+  <view wx:if="{{errMsg}}" class="err banner">{{errMsg}}</view>
+
+  <view wx:if="{{loading && !spots.length}}" class="muted state">加载中…</view>
+  <view wx:elif="{{!spots.length && !errMsg}}" class="muted state">还没有点位,等运营录入</view>
+
+  <view
+    wx:for="{{spots}}"
+    wx:key="spotId"
+    class="card"
+    hover-class="card-hover"
+    data-spot-id="{{item.spotId}}"
+    bindtap="goSpot"
+  >
+    <view class="card-main">
+      <text class="spot-name">{{item.name}}</text>
+      <text class="muted peak">{{item.peakHint}}</text>
+    </view>
+    <view class="card-side">
+      <text class="live {{item.activePeopleCount > 0 ? 'live-on' : ''}}">
+        {{item.activePeopleCount > 0 ? item.activePeopleCount + ' 人 · ' + item.activeDogCount + ' 狗' : '暂时没人'}}
+      </text>
+      <text class="muted regular">常客 {{item.regularCount}}</text>
+    </view>
+  </view>
 </view>

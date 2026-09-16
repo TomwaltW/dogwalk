@@ -1,3 +1,37 @@
 <view class="container">
-  <text class="muted">点位详情</text>
+  <view wx:if="{{errMsg}}" class="err banner">{{errMsg}}</view>
+
+  <view wx:if="{{spot}}" class="hero">
+    <text class="spot-name">{{spot.name}}</text>
+    <text class="muted peak">{{spot.peakHint}}</text>
+    <text class="count {{peopleCount > 0 ? 'count-on' : ''}}">
+      {{peopleCount > 0 ? '此刻 ' + peopleCount + ' 人 · ' + dogCount + ' 狗在场' : '此刻还没人在场'}}
+    </text>
+  </view>
+
+  <view wx:if="{{loading && !sessions.length}}" class="muted state">加载中…</view>
+  <view wx:elif="{{!sessions.length && !errMsg}}" class="muted state">
+    还没人出门。你先点一下,别人就看得见了。
+  </view>
+
+  <view wx:for="{{sessions}}" wx:key="openid" class="row">
+    <image wx:if="{{item.avatarFileID}}" class="avatar" src="{{item.avatarFileID}}" mode="aspectFill" />
+    <view wx:else class="avatar avatar-blank"></view>
+    <view class="row-main">
+      <view class="row-top">
+        <text class="nickname">{{item.nickname}}</text>
+        <text class="muted time">{{item.timeText}}</text>
+      </view>
+      <text class="dogs">{{item.dogText}}</text>
+      <text wx:if="{{item.note}}" class="muted note">{{item.note}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{wxGroupQrFileID}}" class="qr" bindtap="previewQr">
+    <image class="qr-img" src="{{wxGroupQrFileID}}" mode="aspectFit" />
+    <text class="muted qr-tip">点开长按加群,聊天都在群里</text>
+  </view>
+
+  <view class="footer-space"></view>
+  <button class="cta" type="primary" bindtap="goCheckin">我出门了</button>
 </view>
