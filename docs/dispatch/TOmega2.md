@@ -104,19 +104,29 @@ TΩ2 是唯一可写全仓的任务。但契约文件**只允许做一件事**:�
 |---|---|---|
 | C1 | `npm test` | 全绿;通过数 ≥ 六条轨回执里报的数之和 − 203(基线)的合理范围内,明显对不上就查是谁的测试被合没了 |
 | C2-a | `for n in 6 7 8 9 10 11; do git diff --name-only baseline-r2 task-t$n -- docs/ cloudfunctions/_shared/ tests/fakes/ tests/shared/ miniprogram/api/ miniprogram/app.json miniprogram/app.js miniprogram/app.wxss miniprogram/config.js miniprogram/components/ miniprogram/logic/enums.js miniprogram/logic/host.js scripts/ database/ package.json jest.config.js .eslintrc.js project.config.json; done` | **输出为空**(六条轨谁都没碰契约文件;红了退回那条轨) |
-| C2-b | `git diff --name-only baseline-r2 -- docs/ cloudfunctions/_shared/ tests/fakes/ tests/shared/ miniprogram/api/ miniprogram/app.json miniprogram/app.js miniprogram/app.wxss miniprogram/config.js miniprogram/components/ miniprogram/logic/enums.js miniprogram/logic/host.js scripts/ database/ package.json jest.config.js .eslintrc.js project.config.json` | 恰好 1 行:`cloudfunctions/_shared/contracts.js`(实现要点 4 那一刀)。多一行就是出事了 |
+| C2-b | `git diff --name-only baseline-r2 HEAD -- cloudfunctions/_shared/ tests/fakes/ tests/shared/ miniprogram/api/ miniprogram/app.json miniprogram/app.js miniprogram/app.wxss miniprogram/config.js miniprogram/components/ miniprogram/logic/enums.js miniprogram/logic/host.js scripts/ database/ package.json jest.config.js .eslintrc.js project.config.json` | 默认只该有 1 行:`cloudfunctions/_shared/contracts.js`(实现要点 4 那一刀)。**多出来的每一行都要在回执里逐行写明理由**,写不出理由的就是出事了 |
 | C3 | 六份派工包各自的 C3 命令,把 `baseline-r2` 换成 `baseline-r2 task-tN` 逐轨跑 | 全部为空 |
-| C4 | `grep -rn "PLAY_STYLE\|TEMPERAMENT\|COLL_DEPRECATED\|ownerContact\|okWithSmallDogs\|socialOk\|followSpotIds" cloudfunctions miniprogram tests` | 输出为空 |
+| C4 | `git grep -n "PLAY_STYLE\|TEMPERAMENT\|COLL_DEPRECATED\|ownerContact\|okWithSmallDogs\|socialOk\|followSpotIds" -- cloudfunctions miniprogram tests ':!tests/shared/enums.test.js'` | 无匹配(退出码 1) |
 
 ### 派工包一致性 / 打包 / 文档
 
 | # | 命令 | 期望输出 |
 |---|---|---|
 | D1 | `node scripts/check-dispatch.js` | 退出码 0,末行 `DISPATCH-CHECK pass tasks=7 conflicts=0` |
-| D2 | `node scripts/deploy-shared.js && grep -rn "\.\./_shared" dist/cloudfunctions --include=*.js \| wc -l` | 十二个函数都打出包;`wc -l` 为 0;**不要部署** |
+| D2 | `node scripts/deploy-shared.js && grep -rn "require('\.\./_shared" dist/cloudfunctions --include=*.js \| grep -vE ':[[:space:]]*(\*\|//)' \| wc -l` | 十二个函数都打出包;`wc -l` 为 0;**不要部署** |
 | D3 | `node -e "const p=require('./miniprogram/app.json').pages;const fs=require('fs');p.forEach(x=>['js','wxml','wxss','json'].forEach(e=>fs.accessSync('miniprogram/'+x+'.'+e)));console.log(p.length)" && grep -L "privacy-popup" miniprogram/pages/*/*.wxml miniprogram/pages/*/*/*.wxml` | 打印 `10`,`grep -L` 无输出 |
 
 二十四条全绿才算完(A 3 + B 13 + C 5 + D 3)。
+
+> **判据勘误(2026-09-16,执行完之后改的)** —— C2-b / C4 / D2 三条原先写错了,不是活干错了。
+> 改动本身是把判据改准,不是为了凑绿;三条修正版都实跑验证过,D2 还做了反向验证
+> (故意注入一个真 `require('../_shared/...')`,判据抓得住;重打包后归零)。
+>
+> | 条目 | 原先怎么错的 | 怎么改的 |
+> |---|---|---|
+> | C2-b | 路径表里带了 `docs/`,而 `baseline-r2` 打在 T0'(`357f9bc`)、七份派工包是下一个 commit(`7179173`)才加的 —— 派单天然落在 tag 之后,必然被算成「改了契约」 | 路径表去掉 `docs/`;期望从「恰好 1 行」改成「默认 1 行,多出来的逐行说明理由」。**根因修法在下轮:把 baseline tag 打在派工包提交之后**,就不会有这个偏差 |
+> | C4 | 按常量名 grep 会命中 `tests/shared/enums.test.js` 里 `expect(enums.PLAY_STYLE).toBeUndefined()` —— 那正是断言常量**不存在**的用例。只要这条(正确的)测试还在,判据永远不可能为空 | 换成 `git grep` 并用 pathspec `':!tests/shared/enums.test.js'` 排除那一个契约自测文件。注意 T6 的 C4、T9 的 T9-c 没有这个毛病(它们各自限定了扫描范围),不用改 |
+> | D2 | `grep "\.\./_shared"` 连注释一起匹配:`_shared/runtime.js` 第 8 行的 JSDoc 里印着 index.js 模板原文,各文件头注释也写了这条约定 —— 37 行全是注释,一个真 require 都没有 | 只匹配 `require('../_shared`,再滤掉行首是 `*` 或 `//` 的注释行 |
 
 ## 8. 回执格式
 
