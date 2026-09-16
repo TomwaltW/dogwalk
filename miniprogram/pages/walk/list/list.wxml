@@ -1,5 +1,51 @@
+<!-- 约遛列表(tab 页)—— owner: T10。行的内容全在 list.js 的 toRow 里算好,这里只摆。 -->
+<import src="../dog-chips.wxml" />
+
 <view class="container">
   <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+
+  <!-- 筛选:公园 + 日期,都不选就是「最近所有场」 -->
+  <view class="filters">
+    <picker mode="selector" range="{{parkNames}}" value="{{parkIndex}}" bindchange="onParkChange">
+      <view class="filter-pill {{parkId ? 'filter-on' : ''}}">{{parkNames[parkIndex]}}</view>
+    </picker>
+    <picker mode="date" start="{{minDate}}" value="{{date}}" bindchange="onDateChange">
+      <view class="filter-pill {{date ? 'filter-on' : ''}}">{{date ? date : '任意日期'}}</view>
+    </picker>
+    <view wx:if="{{date}}" class="filter-clear" bindtap="onClearDate">清除</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="empty">正在找约遛…</view>
+  <view wx:elif="{{!walks.length}}" class="empty">{{emptyText}}</view>
+
+  <view wx:else class="walk-list">
+    <view
+      class="card walk-row {{item.cancelled ? 'walk-cancelled' : ''}}"
+      wx:for="{{walks}}"
+      wx:key="walkId"
+      data-id="{{item.walkId}}"
+      bindtap="onTapWalk"
+    >
+      <view class="walk-head">
+        <text class="walk-time">{{item.timeText}}</text>
+        <text wx:if="{{item.relText}}" class="pill">{{item.relText}}</text>
+      </view>
+
+      <view class="walk-park">{{item.parkName}}</view>
+
+      <template is="dogChips" data="{{dogs: item.hostDogs}}" />
+
+      <view wx:if="{{item.note}}" class="walk-note">{{item.note}}</view>
+
+      <view class="row-meta">
+        <text>{{item.countText}} 只狗</text>
+        <text wx:if="{{item.cancelled}}" class="pill pill-muted">已取消</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 悬浮的主动作:发起约遛 -->
+  <view class="fab" bindtap="onTapCreate">＋ 发起约遛</view>
 </view>
+
 <privacy-popup id="privacy-popup" />

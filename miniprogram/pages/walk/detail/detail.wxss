@@ -1,1 +1,141 @@
 /* miniprogram/pages/walk/detail/detail.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+@import "../walk.wxss";
+
+.walk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.walk-time {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+.walk-park {
+  font-size: 28rpx;
+  margin-top: 6rpx;
+}
+.walk-note {
+  font-size: 26rpx;
+  color: var(--c-muted);
+  margin-top: 6rpx;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 12rpx 0;
+  border-top: 2rpx solid var(--c-line);
+}
+.member:first-of-type {
+  border-top: none;
+}
+.decide {
+  display: flex;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+.btn-sm {
+  font-size: 24rpx;
+  padding: 0 28rpx;
+  line-height: 60rpx;
+  height: 60rpx;
+}
+
+.chip-meta {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  opacity: 0.7;
+}
+
+/* 留言:自己的靠右,像聊天但不做 IM(spec 1「不做站内私信」) */
+.msg {
+  margin-bottom: 18rpx;
+  max-width: 78%;
+}
+.msg-me {
+  margin-left: auto;
+  text-align: right;
+}
+.msg-head {
+  display: flex;
+  gap: 12rpx;
+  font-size: 22rpx;
+  color: var(--c-muted);
+}
+.msg-me .msg-head {
+  justify-content: flex-end;
+}
+.msg-dog {
+  font-weight: 500;
+}
+.msg-text {
+  display: inline-block;
+  margin-top: 6rpx;
+  padding: 14rpx 20rpx;
+  border-radius: var(--radius-sm);
+  background: var(--c-bg);
+  font-size: 26rpx;
+  text-align: left;
+}
+.msg-me .msg-text {
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+}
+
+.msg-input {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.msg-input .input {
+  flex: 1;
+  background: var(--c-bg);
+  border-radius: var(--radius-sm);
+  padding: 16rpx 20rpx;
+  font-size: 26rpx;
+}
+
+.notice {
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--c-muted);
+  margin: 20rpx 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 32rpx;
+}
+.back-link {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--c-muted);
+}
+
+/* 选狗的半屏面板 */
+.mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 32rpx 32rpx 56rpx;
+  background: var(--c-card);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.sheet .chips {
+  margin-bottom: 32rpx;
+}

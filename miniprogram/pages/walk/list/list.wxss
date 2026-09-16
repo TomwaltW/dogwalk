@@ -1,1 +1,70 @@
 /* miniprogram/pages/walk/list/list.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+@import "../walk.wxss";
+
+.container {
+  padding-bottom: 180rpx; /* 给悬浮按钮留位置,不然最后一行点不到 */
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+.filter-pill {
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background: var(--c-card);
+  color: var(--c-muted);
+  font-size: 26rpx;
+  border: 2rpx solid var(--c-line);
+}
+.filter-on {
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  border-color: var(--c-primary);
+}
+.filter-clear {
+  font-size: 26rpx;
+  color: var(--c-muted);
+  padding: 12rpx 8rpx;
+}
+
+.walk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+.walk-cancelled {
+  opacity: 0.6;
+}
+.walk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.walk-time {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.walk-park {
+  font-size: 28rpx;
+  color: var(--c-text);
+}
+.walk-note {
+  font-size: 26rpx;
+  color: var(--c-muted);
+}
+
+.fab {
+  position: fixed;
+  right: 40rpx;
+  bottom: 60rpx;
+  padding: 24rpx 44rpx;
+  border-radius: 999rpx;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 500;
+  box-shadow: 0 8rpx 24rpx rgba(255, 138, 61, 0.35);
+}

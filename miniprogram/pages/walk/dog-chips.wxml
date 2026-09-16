@@ -1,0 +1,17 @@
+<!-- 约遛三页共用的狗卡片片段 —— owner: T10。
+     spec 3.5 说了没有各轨共用的 components 目录,跨页共用的小片段各自放在自己的 pages 目录下。
+     只渲染 DogCard 的字段(spec 3.2.3),没有主人昵称 / 头像 / openid。 -->
+
+<!-- 一排小卡片:头像 + 名字 + 体型/性格 -->
+<template name="dogChips">
+  <view class="dog-chips">
+    <view class="dog-chip" wx:for="{{dogs}}" wx:key="dogId">
+      <image wx:if="{{item.avatarFileID}}" class="dog-chip-avatar" src="{{item.avatarFileID}}" mode="aspectFill" />
+      <view wx:else class="dog-chip-avatar dog-chip-blank">🐶</view>
+      <view class="dog-chip-text">
+        <text class="dog-chip-name">{{item.name}}</text>
+        <text class="dog-chip-meta">{{item.tagText ? item.sizeText + ' · ' + item.tagText : item.sizeText}}</text>
+      </view>
+    </view>
+  </view>
+</template>
