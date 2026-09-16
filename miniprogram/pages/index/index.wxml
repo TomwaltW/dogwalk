@@ -1,5 +1,36 @@
-<view class="container">
-  <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+<view>
+  <!-- 不开 show-location:那会触发定位授权,首页不需要知道你在哪(spec 1「不记录用户坐标」) -->
+  <map
+    id="map"
+    class="map"
+    markers="{{markers}}"
+    latitude="{{center.latitude}}"
+    longitude="{{center.longitude}}"
+    scale="{{scale}}"
+    bindmarkertap="onMarkerTap"
+  />
+
+  <view class="container">
+    <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
+
+    <view class="section-title">附近的公园</view>
+
+    <view wx:if="{{loading && parks.length === 0}}" class="empty">加载中…</view>
+    <view wx:elif="{{parks.length === 0}}" class="empty">还没有公园,下拉刷新试试</view>
+
+    <view
+      wx:for="{{parks}}"
+      wx:key="parkId"
+      class="card park"
+      data-park-id="{{item.parkId}}"
+      bindtap="onTapPark"
+    >
+      <view class="park-main">
+        <view class="park-name">{{item.name}}</view>
+        <view class="muted">此刻在场 {{item.activeDogCount}} 只狗</view>
+      </view>
+      <text class="park-go">进去看看 ›</text>
+    </view>
+  </view>
 </view>
 <privacy-popup id="privacy-popup" />

@@ -1,1 +1,27 @@
 /* miniprogram/pages/index/index.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+
+.map {
+  width: 100%;
+  height: 70vh;
+  display: block;
+}
+
+.park {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.park-main { flex: 1; min-width: 0; }
+
+.park-name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.park-go {
+  color: var(--c-primary);
+  font-size: 26rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}

@@ -1,1 +1,45 @@
 /* miniprogram/pages/park/park.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+
+.park-name {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.head .btn-wide {
+  margin-top: 20rpx;
+  width: 100%;
+}
+
+.mine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  background: var(--c-ok-soft);
+  border-radius: var(--radius-sm);
+}
+.mine-text {
+  color: var(--c-ok);
+  font-size: 26rpx;
+}
+.btn-sm {
+  font-size: 26rpx;
+  line-height: 2;
+  padding: 0 28rpx;
+  margin: 0;
+}
+
+.list { padding-top: 8rpx; padding-bottom: 8rpx; }
+
+.dog {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid var(--c-line);
+}
+.dog:last-child { border-bottom: none; }
+
+.dog-text { margin-left: 20rpx; min-width: 0; }
+.dog-name { font-size: 30rpx; font-weight: 500; }
+.sub { font-size: 24rpx; }
