@@ -12,7 +12,8 @@ miniprogram/            小程序前端
   app.js / app.json / app.wxss   入口、路由 + tabBar + 隐私声明、主题变量
   config.js             ★ 你要填的配置(环境 ID、订阅消息模板 ID)
   api/index.js          云函数调用封装,页面只调这里
-  logic/                纯逻辑:enums(枚举文案)、host(取 wx)、dog(档案校验)、compat(合拍度规则)、subscribe
+  logic/                纯逻辑:enums(枚举文案)、host(取 wx)、compat(合拍度规则)
+                        狗档案的本地校验在 pages/dog/dog-meta.js;订阅额度记账在服务端 subscribeGrant
   components/privacy-popup   隐私保护指引弹层
   pages/
     index/              首页地图(tab)        park/          公园详情       checkin/       签到 / 签退

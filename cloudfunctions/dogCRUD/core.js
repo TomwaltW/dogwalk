@@ -82,8 +82,8 @@ function isSubsetOf(v, allowed) {
 
 /**
  * 校验狗档案入参。通过返回 null,失败返回字段名。
- * 规则与前端 miniprogram/logic/dog.js 一致 —— 前端那份只为省一次往返,
- * 这份才是真正的边界,两边都得有。
+ * 规则与前端 miniprogram/pages/dog/dog-meta.js 一致 —— 前端那份只为省一次往返,
+ * 这份才是真正的边界,两边都得有。改了这里记得同步改那边。
  *
  * @param {object} dog                  待校验的 dog(可为 Partial<Dog>)
  * @param {{partial?: boolean}} [opts]  partial=true 时缺失字段不算错(update 场景)
