@@ -1,1 +1,66 @@
-/* miniprogram/pages/dog/tag/tag.wxss —— 页面样式只写在这,主色与基础类用 app.wxss 的变量 */
+/* miniprogram/pages/dog/tag/tag.wxss —— 只写本页特有的,主色与基础类用 app.wxss 的变量 */
+.tag-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.dog-line {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.dog-line .dog-name {
+  margin-left: 16rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.qr {
+  width: 400rpx;
+  border-radius: var(--radius-sm);
+  background: var(--c-bg);
+}
+
+.tag-code {
+  margin-top: 16rpx;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 34rpx;
+  letter-spacing: 8rpx;
+  color: var(--c-primary-deep);
+}
+
+.hint {
+  font-size: 24rpx;
+  margin-top: 12rpx;
+}
+
+.block {
+  display: block;
+  width: 100%;
+  margin-top: 24rpx;
+}
+
+.report {
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid var(--c-line);
+}
+
+.report:last-child {
+  border-bottom: none;
+}
+
+.report .time {
+  font-size: 24rpx;
+}
+
+.report-msg {
+  margin: 8rpx 0;
+}
+
+.link {
+  color: var(--c-primary-deep);
+  font-size: 26rpx;
+}

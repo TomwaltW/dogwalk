@@ -1,10 +1,14 @@
-// miniprogram/pages/dog/profile/profile.js —— owner: T5
-// 扫狗牌二维码的落地页。spec 2.2 B7:**游客态**也必须能看,不许跳登录。
-// 页面模块约定见 spec 3.3.4;只调 api 层(spec 3.3.3);失败落 data.errMsg(spec 3.4)。
+// miniprogram/pages/dog/profile/profile.js —— owner: T9
+// 扫身份牌的落地页(寻回页)。spec 2.2 B10:**游客态**必须能看、能留言,不许跳登录。
+// 按第 9 节假设 12:这一页不给任何主人联系方式,路人只能留言;主人靠订阅消息 + 身份牌页看到。
+// 页面模块约定见 spec 3.3.4;只调 api 层(spec 3.3.3);失败一律落 data.errMsg(spec 3.4)。
 
 const api = require('../../../api/index');
+const host = require('../../../logic/host');
 const meta = require('../dog-meta');
-const host = require('../page-host');
+
+const enums = meta.enums;
+const L = enums.LIMITS;
 
 /**
  * tagCode 有两条来路:
@@ -27,69 +31,85 @@ function resolveTagCode(query) {
   return '';
 }
 
-/** ApiError 的人话。注意 AUTH_REQUIRED 也只是提示,不跳登录(B7) */
-function readableError(err, fallback) {
-  if (!err) return fallback;
-  const byCode = {
-    NOT_FOUND: '这个狗牌查不到档案,确认一下牌子上的码',
-    INVALID_PARAM: '狗牌号看起来不对',
-    AUTH_REQUIRED: '暂时读不到这只狗的档案',
+/**
+ * 只留 DogPublic 的 9 个字段(spec 3.2.3)。
+ * 云函数那边已经按契约裁过一遍,这里再裁一次:主人字段一个都不该落进页面 data,
+ * 哪怕以后后端不小心多返回了什么(B10 ④ 就是钉这条)。
+ */
+function toPublic(dog) {
+  const src = dog || {};
+  const lostMode = !!src.lostMode;
+  return {
+    name: src.name || '',
+    breed: src.breed || '',
+    sizeClass: src.sizeClass || '',
+    gender: src.gender || '',
+    birthMonth: src.birthMonth || '',
+    avatarFileID: src.avatarFileID || '',
+    tags: Array.isArray(src.tags) ? src.tags.slice() : [],
+    lostMode,
+    lostNote: lostMode ? src.lostNote || '' : '',
   };
-  return byCode[err.code] || err.message || fallback;
 }
 
-/** 给 wxml 用的展示串,顺手把枚举翻成中文 */
-function toView(dog) {
+/** 给 wxml 的展示串 */
+function viewOf(dog) {
   return {
-    sizeClassText: meta.labelOf('sizeClass', dog.sizeClass),
-    genderText: meta.labelOf('gender', dog.gender),
-    playStyleText: meta.labelsOf('playStyle', dog.playStyle),
-    temperamentText: meta.labelsOf('temperament', dog.temperament),
-    neuteredText: dog.neutered ? '已绝育' : '未绝育',
-    okWithSmallDogsText: dog.okWithSmallDogs ? '和小型犬相处良好' : '和小型犬需要留意',
+    sizeText: meta.sizeText(dog.sizeClass),
+    genderText: meta.genderText(dog.gender),
+    tagsText: meta.tagsText(dog.tags),
   };
 }
+
+/** 读档案 / 提交留言时 ApiError 的人话。AUTH_REQUIRED 也只是提示,不跳登录(B10) */
+const ERR_TEXT = {
+  NOT_FOUND: '这个身份牌查不到档案,确认一下牌子上的码',
+  INVALID_PARAM: '身份牌号看起来不对',
+  AUTH_REQUIRED: '暂时读不到这只狗的档案',
+};
 
 const options = {
   data: {
     tagCode: '',
-    /** DogPublic(spec 3.2),拿不到时为 null */
+    /** DogPublic(spec 3.2.3),拿不到时为 null */
     dog: null,
     view: null,
-    /** 未登录 —— 只影响页面上要不要显示「登录后可以…」这类提示,不影响能否看档案 */
-    isGuest: true,
-    /** 只有走失模式下 ownerContact 才非 null(spec 3.2),据此决定要不要给联系入口 */
-    canContact: false,
+    /** 走失态的醒目横幅 */
+    showLostBanner: false,
+
+    // 留言表单 —— 游客也能用
+    message: '',
+    messageMax: L.FOUND_MSG_MAX,
+    attachLocation: false,
+    sent: false,
+    sentText: '',
+
     loading: true,
+    submitting: false,
     errMsg: '',
+
+    lostTitle: '我走丢了,看到我请给主人留言',
+    formHint: '留言会直接发给主人。附上位置能让他更快找过来,不想给也可以不勾',
   },
 
   async onLoad(query) {
     const tagCode = resolveTagCode(query);
-
-    // 登录态只用来决定文案,读档案本身不需要登录(scanTag 允许游客,spec 3.4)
-    const logged = !!host.globalDataOf(this).logged;
-    this.setData({ isGuest: !logged });
-
     if (!tagCode) {
-      this.setData({ loading: false, errMsg: '没读到狗牌号,请重新扫一次牌子' });
+      this.setData({ loading: false, errMsg: '没读到身份牌号,请重新扫一次牌子' });
       return;
     }
-
     this.setData({ tagCode, loading: true, errMsg: '' });
     await this.fetch(tagCode);
   },
 
-  /** 拉一次公开档案。无论成败都不跳转 —— 游客必须能停在这一页(B7) */
+  /** 拉一次公开档案。无论成败都不跳转 —— 游客必须能停在这一页(B10) */
   async fetch(tagCode) {
     try {
-      const dog = await api.getDogPublic(tagCode);
-      const safe = dog || {};
+      const dog = toPublic(await api.getDogPublic(tagCode));
       this.setData({
-        dog: safe,
-        view: toView(safe),
-        // ownerContact 只在 lostMode 时非 null,两个条件都要,不靠单边字段
-        canContact: !!(safe.lostMode && safe.ownerContact),
+        dog,
+        view: viewOf(dog),
+        showLostBanner: !!dog.lostMode,
         loading: false,
         errMsg: '',
       });
@@ -97,27 +117,17 @@ const options = {
       this.setData({
         dog: null,
         view: null,
-        canContact: false,
+        showLostBanner: false,
         loading: false,
-        errMsg: readableError(err, '档案没读出来,下拉重试'),
+        errMsg: meta.readableError(err, '档案没读出来,下拉重试', ERR_TEXT),
       });
     }
   },
 
-  /** 走失模式下把主人联系方式亮出来。用弹窗,方便长按复制 */
-  onContactOwner() {
-    if (!this.data.canContact) {
-      this.setData({ errMsg: '这只狗没有开走失模式,看不到主人联系方式' });
-      return;
-    }
+  async onPullDownRefresh() {
+    if (this.data.tagCode) await this.fetch(this.data.tagCode);
     const w = host.wxOf(this);
-    if (!w) return;
-    w.showModal({
-      title: '联系主人',
-      content: this.data.dog.ownerContact,
-      confirmText: '知道了',
-      showCancel: false,
-    });
+    if (w) w.stopPullDownRefresh();
   },
 
   onPreviewAvatar() {
@@ -127,17 +137,98 @@ const options = {
     if (w) w.previewImage({ urls: [url], current: url });
   },
 
-  async onPullDownRefresh() {
-    if (this.data.tagCode) await this.fetch(this.data.tagCode);
-    const w = host.wxOf(this);
-    if (w) w.stopPullDownRefresh();
+  onMessageInput(e) {
+    const value = (e && e.detail && e.detail.value) || '';
+    this.setData({ message: value, errMsg: '' });
   },
 
-  /** 转发出去还是这一页,带上同一个狗牌号 */
+  onToggleLocation(e) {
+    const on = !!(e && e.detail && e.detail.value);
+    this.setData({ attachLocation: on, errMsg: '' });
+  },
+
+  /**
+   * 取一次定位。拿不到就返回 null —— 调用处据此降级成「不带位置」,
+   * 不让定位失败挡住留言本身(spec 3.4 最后一行是签到页的口径,寻回这边位置是选填)。
+   */
+  async pickLocation() {
+    const w = host.wxOf(this);
+    if (!w) return null;
+    try {
+      const res = await host.promisify(w, 'getLocation')({ type: 'gcj02' });
+      const lat = res && res.latitude;
+      const lng = res && res.longitude;
+      if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+        return { latitude: lat, longitude: lng };
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async onSubmit() {
+    if (this.data.submitting) return;
+
+    const message = String(this.data.message || '').trim();
+    if (!message) {
+      this.setData({ errMsg: '写一句话告诉主人你在哪儿看到它' });
+      return;
+    }
+    if (enums.charLength(message) > L.FOUND_MSG_MAX) {
+      this.setData({ errMsg: '留言最多 ' + L.FOUND_MSG_MAX + ' 个字' });
+      return;
+    }
+    if (!this.data.tagCode) {
+      this.setData({ errMsg: '没读到身份牌号,请重新扫一次牌子' });
+      return;
+    }
+
+    this.setData({ submitting: true, errMsg: '' });
+
+    const payload = { tagCode: this.data.tagCode, message };
+    if (this.data.attachLocation) {
+      const loc = await this.pickLocation();
+      if (!loc) {
+        // 取消勾选 + 提示,留言原样留在框里;再点一次「发送」就不带位置发出去
+        this.setData({
+          attachLocation: false,
+          submitting: false,
+          errMsg: '没拿到你的位置(可以去设置里打开定位);再点一次「发送」就不带位置提交',
+        });
+        return;
+      }
+      payload.latitude = loc.latitude;
+      payload.longitude = loc.longitude;
+    }
+
+    try {
+      const res = await api.reportFound(payload);
+      this.setData({
+        sent: true,
+        submitting: false,
+        message: '',
+        errMsg: '',
+        sentText: res && res.notified ? '已通知主人' : '已留言,主人打开小程序就能看到',
+      });
+    } catch (err) {
+      this.setData({
+        submitting: false,
+        errMsg: meta.readableError(err, '留言没发出去,再试一次', ERR_TEXT),
+      });
+    }
+  },
+
+  /** 再留一条(比如先报了位置,又想补一句) */
+  onAgain() {
+    this.setData({ sent: false, sentText: '', message: '', errMsg: '' });
+  },
+
+  /** 转发出去还是这一页,带上同一个身份牌号 */
   onShareAppMessage() {
     const name = (this.data.dog && this.data.dog.name) || '这只狗';
     return {
-      title: this.data.dog && this.data.dog.lostMode ? '帮忙找找 ' + name : name + ' 的档案',
+      title: this.data.showLostBanner ? '帮忙找找 ' + name : name + ' 的档案',
       path: '/pages/dog/profile/profile?tagCode=' + this.data.tagCode,
     };
   },

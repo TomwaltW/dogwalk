@@ -1,117 +1,104 @@
-// miniprogram/pages/dog/edit/edit.js —— owner: T5
-// 页面模块约定见 spec 3.3.4:Page(options) 之后 module.exports = options。
-// 页面只调 api 层(spec 3.3.3),不碰云函数;失败一律落到 data.errMsg(spec 3.4)。
+// miniprogram/pages/dog/edit/edit.js —— owner: T9
+// 狗档案编辑(v2 字段)。页面模块约定见 spec 3.3.4:Page(options) 之后 module.exports = options;
+// 只调 api 层(spec 3.3.3),失败一律落 data.errMsg(spec 3.4),不抛、不白屏。
 
 const api = require('../../../api/index');
+const host = require('../../../logic/host');
 const meta = require('../dog-meta');
-const host = require('../page-host');
+const clock = require('../clock');
 
-/** 空档案 —— 字段与默认值照 spec 3.2 的 dogs 形状 */
+const enums = meta.enums;
+const L = enums.LIMITS;
+
+/** 客户端可写的 12 个字段 —— spec 3.3.2 dogCRUD 那一行,顺序照抄 */
+const WRITABLE = [
+  'name',
+  'breed',
+  'gender',
+  'birthMonth',
+  'sizeClass',
+  'neutered',
+  'vaccinated',
+  'licenseNo',
+  'tags',
+  'avatarFileID',
+  'lostMode',
+  'lostNote',
+];
+
+/** 空档案 —— 默认值照 spec 3.2.2 的 dogs 形状 */
 function emptyDog() {
   return {
     name: '',
     breed: '',
-    sizeClass: 'medium',
-    birthMonth: '',
     gender: 'male',
+    birthMonth: '',
+    sizeClass: 'medium',
     neutered: false,
+    vaccinated: false,
+    licenseNo: '',
+    tags: [],
     avatarFileID: '',
-    playStyle: [],
-    temperament: [],
-    okWithSmallDogs: true,
-    socialOk: true,
-    tagCode: '',
-    qrFileID: '',
     lostMode: false,
+    lostNote: '',
   };
 }
 
-/** 把 api 返回的 Dog 合进表单形状,多余字段(createdAt 等)不进 data */
+/** 把 api 返回的 Dog 合进表单形状;createdAt / tagCode 这些不归本页管的字段不进 data */
 function toForm(dog) {
-  const form = Object.assign(emptyDog(), dog || {});
-  form.playStyle = Array.isArray(form.playStyle) ? form.playStyle.slice() : [];
-  form.temperament = Array.isArray(form.temperament) ? form.temperament.slice() : [];
+  const src = dog || {};
+  const form = emptyDog();
+  WRITABLE.forEach((k) => {
+    if (src[k] !== undefined && src[k] !== null) form[k] = src[k];
+  });
+  form.tags = Array.isArray(form.tags) ? form.tags.slice() : [];
+  form.neutered = !!form.neutered;
+  form.vaccinated = !!form.vaccinated;
+  form.lostMode = !!form.lostMode;
+  if (src._id) form._id = src._id;
   return form;
 }
 
-/** 提交给 api.saveDog 的载荷:只带用户能改的字段;_id 决定 create 还是 update */
+/** 提交给 api.saveDog 的载荷:只带那 12 个;_id 决定 create 还是 update */
 function toPayload(form) {
-  const out = {
-    name: String(form.name || '').trim(),
-    breed: String(form.breed || '').trim(),
-    sizeClass: form.sizeClass,
-    birthMonth: String(form.birthMonth || '').trim(),
-    gender: form.gender,
-    neutered: !!form.neutered,
-    avatarFileID: form.avatarFileID || '',
-    playStyle: form.playStyle.slice(),
-    temperament: form.temperament.slice(),
-    okWithSmallDogs: !!form.okWithSmallDogs,
-    socialOk: !!form.socialOk,
-  };
+  const out = {};
+  WRITABLE.forEach((k) => {
+    out[k] = form[k];
+  });
+  out.name = String(out.name || '').trim();
+  out.breed = String(out.breed || '').trim();
+  out.birthMonth = String(out.birthMonth || '').trim();
+  out.licenseNo = String(out.licenseNo || '').trim();
+  out.lostNote = String(out.lostNote || '');
+  out.tags = Array.isArray(out.tags) ? out.tags.slice() : [];
+  out.neutered = !!out.neutered;
+  out.vaccinated = !!out.vaccinated;
+  out.lostMode = !!out.lostMode;
+  out.avatarFileID = out.avatarFileID || '';
   if (form._id) out._id = form._id;
   return out;
 }
 
-/**
- * 本地校验 —— 拦在调 api 之前,省一次往返,也让用户立刻看见哪儿不对。
- * 规则来自 spec 3.2;云函数那边还会再校一次(spec 3.4 INVALID_PARAM),这里不是唯一防线。
- * @param {object} form
- * @returns {string} 出错原因;'' 表示通过
- */
-function validate(form) {
-  const name = String(form.name || '').trim();
-  const len = meta.charLength(name);
-  if (len === 0) return '狗的名字不能为空';
-  if (len > meta.NAME_MAX) return '狗的名字最多 ' + meta.NAME_MAX + ' 个字符,现在是 ' + len + ' 个';
-
-  if (meta.SIZE_CLASS.indexOf(form.sizeClass) < 0) return 'sizeClass 只能是小型/中型/大型犬';
-  if (meta.GENDER.indexOf(form.gender) < 0) return 'gender 只能是公或母';
-
-  const birthMonth = String(form.birthMonth || '').trim();
-  if (birthMonth !== '' && !meta.BIRTH_MONTH_RE.test(birthMonth)) {
-    return 'birthMonth 要写成 YYYY-MM,例如 2023-05';
-  }
-
-  if (!meta.isSubset(form.playStyle, meta.PLAY_STYLE)) return 'playStyle 有不认识的取值';
-  if (!meta.isSubset(form.temperament, meta.TEMPERAMENT)) return 'temperament 有不认识的取值';
-
-  return '';
-}
-
-/**
- * 选中态摊成 { chase: true } 这样的映射 —— wxml 表达式里调不了 indexOf,
- * 只能取属性,所以选中与否得在 js 侧先算好。
- */
-function checkedMap(values) {
-  const out = {};
-  (Array.isArray(values) ? values : []).forEach((v) => {
-    out[v] = true;
-  });
-  return out;
-}
-
-/** wxml 直接用的派生值:枚举翻中文 + 多选的选中映射 */
+/** wxml 直接用的派生值:枚举翻中文 + 多选的选中映射 + 几个计数 */
 function viewOf(form) {
   return {
-    sizeClassText: meta.labelOf('sizeClass', form.sizeClass),
-    genderText: meta.labelOf('gender', form.gender),
-    playStyleChecked: checkedMap(form.playStyle),
-    temperamentChecked: checkedMap(form.temperament),
-    nameLen: meta.charLength(String(form.name || '').trim()),
+    sizeText: meta.sizeText(form.sizeClass),
+    genderText: meta.genderText(form.gender),
+    tagChecked: meta.checkedMap(form.tags),
+    nameLen: enums.charLength(String(form.name || '').trim()),
+    breedLen: enums.charLength(String(form.breed || '').trim()),
+    licenseLen: enums.charLength(String(form.licenseNo || '').trim()),
   };
 }
 
-/** ApiError 的人话(spec 3.3.3:reject 的是带 code 的 Error) */
-function readableError(err, fallback) {
-  if (!err) return fallback;
-  const byCode = {
-    AUTH_REQUIRED: '请先登录',
-    FORBIDDEN: '这不是你的狗',
-    NOT_FOUND: '这只狗不在了',
-    INVALID_PARAM: '有字段填得不对:' + (err.message || ''),
-  };
-  return byCode[err.code] || err.message || fallback;
+/**
+ * 头像的云存储路径。同一只狗换头像不能互相覆盖,所以带上时间戳;
+ * 时间来自 ../clock.js —— 页面里不许出现裸的当前时间调用(spec 3.3.4)。
+ */
+function cloudPathOf(dogId, tempFilePath) {
+  const m = String(tempFilePath).match(/\.[a-zA-Z0-9]+$/);
+  const ext = m ? m[0].toLowerCase() : '.jpg';
+  return 'dogs/' + (dogId || 'new') + '-' + clock.nowMs() + ext;
 }
 
 const options = {
@@ -121,13 +108,13 @@ const options = {
     isNew: true,
     loading: false,
     saving: false,
+    uploading: false,
     errMsg: '',
-    // 给 wxml 的选项表
-    sizeClassOptions: meta.optionsOf('sizeClass', meta.SIZE_CLASS),
-    genderOptions: meta.optionsOf('gender', meta.GENDER),
-    playStyleOptions: meta.optionsOf('playStyle', meta.PLAY_STYLE),
-    temperamentOptions: meta.optionsOf('temperament', meta.TEMPERAMENT),
-    nameMax: meta.NAME_MAX,
+    // 给 wxml 的选项表与长度上限
+    sizeOptions: enums.optionsOf(enums.SIZE_CLASS, enums.SIZE_LABEL),
+    genderOptions: enums.optionsOf(enums.GENDER, enums.GENDER_LABEL),
+    tagOptions: enums.optionsOf(enums.TAGS, enums.TAG_LABEL),
+    limits: { name: L.NAME_MAX, breed: L.BREED_MAX, license: L.LICENSE_MAX },
   },
 
   /**
@@ -143,8 +130,7 @@ const options = {
 
     this.setData({ isNew: false, loading: true, errMsg: '' });
     try {
-      // api 的十个方法里没有「按 id 取单只狗」,只有 listMyDogs;
-      // 编辑页本来就只能编自己的狗,从自己的列表里挑即可(spec 3.3.3)。
+      // api 里没有「按 id 取单只狗」,只有 listMyDogs;编辑页本来也只能编自己的狗(spec 3.3.3)
       const dogs = await api.listMyDogs();
       const found = (Array.isArray(dogs) ? dogs : []).find((d) => d && d._id === dogId);
       if (!found) {
@@ -154,11 +140,11 @@ const options = {
       const form = toForm(found);
       this.setData({ dog: form, view: viewOf(form), loading: false, errMsg: '' });
     } catch (err) {
-      this.setData({ loading: false, errMsg: readableError(err, '档案加载失败,下拉重试') });
+      this.setData({ loading: false, errMsg: meta.readableError(err, '档案加载失败,退出去再进一次') });
     }
   },
 
-  /** 单值字段:input / picker / switch 都走这一个,字段名放 data-field */
+  /** 单值字段:input / switch 都走这一个,字段名放 data-field */
   onFieldInput(e) {
     const field = e && e.currentTarget && e.currentTarget.dataset.field;
     if (!field) return;
@@ -168,7 +154,7 @@ const options = {
     this.setData({ ['dog.' + field]: value, view: viewOf(next), errMsg: '' });
   },
 
-  /** picker 回来的是下标,按 data-options 的字段名换成枚举值 */
+  /** picker 回来的是下标,按 data-options 指的那张表换成枚举值 */
   onPickerChange(e) {
     const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
     const list = this.data[ds.options] || [];
@@ -178,28 +164,63 @@ const options = {
     this.setData({ ['dog.' + ds.field]: picked.value, view: viewOf(next), errMsg: '' });
   },
 
-  /** 多值字段(playStyle / temperament):点一下进,再点一下出 */
-  onToggleMulti(e) {
-    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
-    const field = ds.field;
-    const value = ds.value;
-    if (!field || !value) return;
+  /** 性格标签:点一下进,再点一下出 */
+  onToggleTag(e) {
+    const value = e && e.currentTarget && e.currentTarget.dataset.value;
+    if (!value) return;
 
-    const cur = Array.isArray(this.data.dog[field]) ? this.data.dog[field].slice() : [];
+    const cur = Array.isArray(this.data.dog.tags) ? this.data.dog.tags.slice() : [];
     const at = cur.indexOf(value);
     if (at >= 0) cur.splice(at, 1);
     else cur.push(value);
 
-    const next = Object.assign({}, this.data.dog, { [field]: cur });
-    this.setData({ ['dog.' + field]: cur, view: viewOf(next), errMsg: '' });
+    const next = Object.assign({}, this.data.dog, { tags: cur });
+    this.setData({ 'dog.tags': cur, view: viewOf(next), errMsg: '' });
+  },
+
+  /** 选一张照片传上去。sizeType 压缩过 —— 服务端的图片安全检查限单图 1MB(假设 11) */
+  async onChooseAvatar() {
+    if (this.data.uploading) return;
+    const w = host.wxOf(this);
+    if (!w) return;
+
+    let tempFilePath = '';
+    try {
+      const res = await host.promisify(w, 'chooseMedia')({
+        count: 1,
+        mediaType: ['image'],
+        sizeType: ['compressed'],
+      });
+      const files = (res && res.tempFiles) || [];
+      tempFilePath = (files[0] && files[0].tempFilePath) || '';
+    } catch (e) {
+      // 用户在相册里点了取消 —— 不是错误,静默返回
+      return;
+    }
+    if (!tempFilePath) return;
+
+    this.setData({ uploading: true, errMsg: '' });
+    try {
+      const fileID = await api.uploadFile(cloudPathOf(this.data.dog._id, tempFilePath), tempFilePath);
+      this.setData({ 'dog.avatarFileID': fileID || '', uploading: false, errMsg: '' });
+    } catch (err) {
+      this.setData({ uploading: false, errMsg: meta.readableError(err, '照片没传上去,再试一次') });
+    }
+  },
+
+  onPreviewAvatar() {
+    const url = this.data.dog.avatarFileID;
+    if (!url) return;
+    const w = host.wxOf(this);
+    if (w) w.previewImage({ urls: [url], current: url });
   },
 
   async onSave() {
-    if (this.data.saving) return;
+    if (this.data.saving || this.data.uploading) return;
 
-    const bad = validate(this.data.dog);
+    const bad = meta.validateDog(this.data.dog);
     if (bad) {
-      // 本地就拦下,不往 api 发(spec 6 节 T5)
+      // 本地就拦下,不往 api 发(spec 6 节 T9)
       this.setData({ errMsg: bad });
       return;
     }
@@ -211,8 +232,19 @@ const options = {
       const w = host.wxOf(this);
       if (w) w.showToast({ title: '已保存', icon: 'success' });
     } catch (err) {
-      this.setData({ saving: false, errMsg: readableError(err, '保存失败,请重试') });
+      this.setData({ saving: false, errMsg: meta.readableError(err, '保存失败,请重试') });
     }
+  },
+
+  /** 身份牌是单独一页(小程序码 / 存相册 / 走失模式 / 寻回留言都在那边) */
+  onOpenTag() {
+    const dogId = this.data.dog._id;
+    if (!dogId) {
+      this.setData({ errMsg: '先保存档案,再领身份牌' });
+      return;
+    }
+    const w = host.wxOf(this);
+    if (w) w.navigateTo({ url: '/pages/dog/tag/tag?dogId=' + dogId });
   },
 
   async onRemove() {
@@ -224,45 +256,30 @@ const options = {
       return;
     }
 
+    let confirmed = false;
+    try {
+      const res = await host.promisify(w, 'showModal')({
+        title: '删掉这只狗?',
+        content: '档案和身份牌会一起删掉,找不回来',
+        confirmText: '删掉',
+      });
+      confirmed = !!(res && res.confirm);
+    } catch (e) {
+      // 弹窗弹不出来就当没确认 —— 宁可不删
+      return;
+    }
+    if (!confirmed) return;
+
     this.setData({ errMsg: '' });
     try {
       await api.removeDog(dogId);
       if (w) {
-        w.showToast({ title: '已删除', icon: 'success' });
+        w.showToast({ title: '已删掉', icon: 'success' });
         w.navigateBack({ delta: 1 });
       }
     } catch (err) {
-      this.setData({ errMsg: readableError(err, '删除失败,请重试') });
+      this.setData({ errMsg: meta.readableError(err, '删除失败,请重试') });
     }
-  },
-
-  /** 生成狗牌小程序码 —— 狗得先存下来才有 _id */
-  async onGenTag() {
-    const dogId = this.data.dog._id;
-    if (!dogId) {
-      this.setData({ errMsg: '先保存档案,再生成狗牌' });
-      return;
-    }
-
-    this.setData({ errMsg: '' });
-    try {
-      const res = await api.genTag(dogId);
-      this.setData({
-        'dog.tagCode': (res && res.tagCode) || '',
-        'dog.qrFileID': (res && res.qrFileID) || '',
-        errMsg: '',
-      });
-    } catch (err) {
-      this.setData({ errMsg: readableError(err, '狗牌生成失败,请重试') });
-    }
-  },
-
-  /** 点狗牌图看大图 */
-  onPreviewTag() {
-    const url = this.data.dog.qrFileID;
-    if (!url) return;
-    const w = host.wxOf(this);
-    if (w) w.previewImage({ urls: [url], current: url });
   },
 };
 
