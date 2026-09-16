@@ -1,5 +1,133 @@
+<!-- 约遛详情 —— owner: T10。
+     五种视角(none / pending / approved / host / rejected|left)靠 detail.js 里算好的
+     canXxx 开关切换,WXML 不做判断。成员只显示狗,没有主人昵称(spec 2.1)。 -->
+<import src="../dog-chips.wxml" />
+
 <view class="container">
+  <view wx:if="{{cancelledText}}" class="banner-warn">{{cancelledText}}</view>
   <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+
+  <view wx:if="{{loading && !walk}}" class="empty">正在打开…</view>
+
+  <view wx:elif="{{walk}}">
+    <!-- 概要 -->
+    <view class="card">
+      <view class="walk-head">
+        <text class="walk-time">{{timeText}}</text>
+        <text class="pill {{walk.status === 'cancelled' ? 'pill-muted' : ''}}">{{walk.countText}} 只狗</text>
+      </view>
+      <view class="walk-park">{{walk.parkName}}</view>
+      <view wx:if="{{walk.note}}" class="walk-note">{{walk.note}}</view>
+
+      <view class="section-title">发起人的狗</view>
+      <template is="dogChips" data="{{dogs: hostDogs}}" />
+    </view>
+
+    <!-- 合拍度:warn 用醒目的横幅,info 温和一点 -->
+    <view wx:if="{{compatHints.length}}" class="compat">
+      <view wx:for="{{compatHints}}" wx:key="text" class="{{item.level === 'warn' ? 'banner-warn' : 'compat-info'}}">
+        {{item.text}}
+      </view>
+    </view>
+
+    <!-- 已加入的成员 -->
+    <view wx:if="{{approvedMembers.length}}" class="card">
+      <view class="section-title">已经加入</view>
+      <view class="member" wx:for="{{approvedMembers}}" wx:key="memberId">
+        <template is="dogChips" data="{{dogs: item.dogs}}" />
+        <text class="pill">{{item.isMe ? '我' : item.statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 发起人才看得到的待确认队列 -->
+    <view wx:if="{{isHost && pendingMembers.length}}" class="card">
+      <view class="section-title">等你确认</view>
+      <view class="member" wx:for="{{pendingMembers}}" wx:key="memberId">
+        <template is="dogChips" data="{{dogs: item.dogs}}" />
+        <view wx:if="{{canDecide}}" class="decide">
+          <button
+            class="btn-ghost btn-sm"
+            disabled="{{submitting}}"
+            data-id="{{item.memberId}}"
+            data-approve="{{true}}"
+            bindtap="onDecide"
+          >同意</button>
+          <button
+            class="btn-danger btn-sm"
+            disabled="{{submitting}}"
+            data-id="{{item.memberId}}"
+            data-approve="{{false}}"
+            bindtap="onDecide"
+          >婉拒</button>
+        </view>
+        <text wx:else class="pill pill-muted">{{item.statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 留言区:只对发起人和已批准成员开放(spec 第 9 节假设 8) -->
+    <view wx:if="{{showMessages}}" class="card">
+      <view class="section-title">留言</view>
+      <view wx:if="{{!messages.length}}" class="empty">还没有人说话,先打个招呼吧</view>
+      <view
+        class="msg {{item.isMe ? 'msg-me' : ''}}"
+        wx:for="{{messages}}"
+        wx:key="messageId"
+      >
+        <view class="msg-head">
+          <text class="msg-dog">{{item.dogName}}</text>
+          <text class="msg-time">{{item.timeText}}</text>
+        </view>
+        <view class="msg-text">{{item.text}}</view>
+      </view>
+
+      <view wx:if="{{canSend}}" class="msg-input">
+        <input
+          class="input"
+          value="{{draft}}"
+          maxlength="{{messageMax}}"
+          placeholder="说点什么"
+          bindinput="onDraftInput"
+        />
+        <button class="btn-primary btn-sm" disabled="{{submitting}}" bindtap="onSend">发送</button>
+      </view>
+    </view>
+
+    <!-- 一句话说清我现在是什么状态 -->
+    <view wx:if="{{noticeText}}" class="notice">{{noticeText}}</view>
+
+    <!-- 操作区:已取消 / 已婉拒 / 已退出时这里整块都不出现 -->
+    <view class="actions">
+      <button wx:if="{{canJoin}}" class="btn-primary" bindtap="onTapJoin">申请加入</button>
+      <button wx:if="{{canCancelJoin}}" class="btn-ghost" disabled="{{submitting}}" bindtap="onLeave">
+        取消申请
+      </button>
+      <button wx:if="{{canLeave}}" class="btn-danger" disabled="{{submitting}}" bindtap="onLeave">
+        退出这次约遛
+      </button>
+      <button wx:if="{{canCancelWalk}}" class="btn-danger" disabled="{{submitting}}" bindtap="onCancelWalk">
+        取消约遛
+      </button>
+    </view>
+
+    <view class="back-link" bindtap="onBackToList">回约遛列表</view>
+  </view>
+
+  <!-- 申请加入时选带哪几只狗 -->
+  <view wx:if="{{picking}}" class="mask" bindtap="onCancelPick" />
+  <view wx:if="{{picking}}" class="sheet">
+    <view class="section-title">带哪几只狗去?</view>
+    <view class="chips">
+      <view
+        class="chip {{item.picked ? 'chip-on' : ''}}"
+        wx:for="{{myDogs}}"
+        wx:key="dogId"
+        data-id="{{item.dogId}}"
+        bindtap="onPickDog"
+      >{{item.name}}<text class="chip-meta">{{item.sizeText}}</text></view>
+    </view>
+    <button class="btn-primary" disabled="{{submitting}}" bindtap="onConfirmJoin">提交申请</button>
+    <view class="back-link" bindtap="onCancelPick">再想想</view>
+  </view>
 </view>
+
 <privacy-popup id="privacy-popup" />

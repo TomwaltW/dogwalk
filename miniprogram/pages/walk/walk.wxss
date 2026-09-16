@@ -1,0 +1,80 @@
+/* 约遛三页共用样式 —— owner: T10。主色与基础类都在 app.wxss,这里只写约遛自己的排版。 */
+
+/* ---- 狗卡片片段(dog-chips.wxml)---- */
+.dog-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.dog-chip {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 8rpx 20rpx 8rpx 8rpx;
+  background: var(--c-bg);
+  border-radius: 999rpx;
+}
+.dog-chip-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--c-line);
+  flex-shrink: 0;
+}
+.dog-chip-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+}
+.dog-chip-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.dog-chip-name {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+.dog-chip-meta {
+  font-size: 22rpx;
+  color: var(--c-muted);
+}
+.dog-picker-meta {
+  margin-left: 8rpx;
+  font-size: 22rpx;
+  opacity: 0.7;
+}
+
+/* ---- 合拍度提示 ---- */
+.compat {
+  margin-bottom: 16rpx;
+}
+.compat-info {
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  border-radius: var(--radius-sm);
+  padding: 16rpx 24rpx;
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+}
+
+/* ---- 行内的次要文字 ---- */
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  font-size: 24rpx;
+  color: var(--c-muted);
+}
+.pill {
+  padding: 2rpx 16rpx;
+  border-radius: 999rpx;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  font-size: 22rpx;
+}
+.pill-muted {
+  background: var(--c-line);
+  color: var(--c-muted);
+}
