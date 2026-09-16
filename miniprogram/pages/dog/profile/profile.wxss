@@ -1,10 +1,21 @@
-/* miniprogram/pages/dog/profile/profile.wxss */
+/* miniprogram/pages/dog/profile/profile.wxss —— 只写本页特有的,主色与基础类用 app.wxss 的变量 */
 .lost {
-  padding: 16rpx 20rpx;
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+  border-radius: var(--radius);
+  padding: 28rpx 24rpx;
   margin-bottom: 20rpx;
-  background: #fff1f0;
-  color: #d4380d;
-  border-radius: 12rpx;
+}
+
+.lost-title {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.lost-note {
+  margin-top: 12rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
 }
 
 .head {
@@ -12,17 +23,8 @@
   text-align: center;
 }
 
-.avatar {
-  width: 180rpx;
-  height: 180rpx;
-  border-radius: 50%;
-  background: #eee;
-}
-
-.avatar.placeholder {
-  line-height: 180rpx;
-  font-size: 80rpx;
-  display: inline-block;
+.head .avatar-lg {
+  display: inline-flex;
 }
 
 .name {
@@ -35,16 +37,10 @@
   font-size: 24rpx;
 }
 
-.card {
-  padding: 8rpx 24rpx;
-  background: #fff;
-  border-radius: 12rpx;
-}
-
 .line {
   display: flex;
   padding: 16rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 2rpx solid var(--c-line);
 }
 
 .line:last-child {
@@ -52,26 +48,29 @@
 }
 
 .k {
-  width: 160rpx;
-  color: #8a8a8a;
+  width: 140rpx;
+  color: var(--c-muted);
 }
 
 .v {
   flex: 1;
 }
 
-.empty {
-  padding: 120rpx 0;
+.hint {
+  font-size: 24rpx;
+}
+
+.sent {
   text-align: center;
 }
 
-.tip {
+.sent-text {
+  font-size: 32rpx;
+  color: var(--c-ok);
+  padding: 20rpx 0;
+}
+
+.block {
   display: block;
   margin-top: 24rpx;
-  font-size: 24rpx;
-  text-align: center;
-}
-
-.primary {
-  margin-top: 32rpx;
 }

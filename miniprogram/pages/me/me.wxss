@@ -1,14 +1,14 @@
-/* miniprogram/pages/me/me.wxss */
+/* miniprogram/pages/me/me.wxss —— 只写本页特有的,主色与基础类用 app.wxss 的变量 */
 .head {
-  padding: 32rpx 0;
+  padding: 32rpx 0 40rpx;
   text-align: center;
 }
 
-.avatar {
+.head .avatar {
   width: 140rpx;
   height: 140rpx;
-  border-radius: 50%;
-  background: #eee;
+  display: inline-flex;
+  font-size: 56rpx;
 }
 
 .nickname {
@@ -17,82 +17,85 @@
   font-weight: 600;
 }
 
-.banner {
-  padding: 16rpx 20rpx;
-  margin-bottom: 20rpx;
-  background: #fff2e8;
-  border-radius: 12rpx;
-}
-
-.section {
-  padding: 20rpx 24rpx;
-  background: #fff;
-  border-radius: 12rpx;
-}
-
-.section-head {
+.row-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding-bottom: 12rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  justify-content: space-between;
 }
 
-.add {
-  color: #1a6dd4;
+.link {
+  color: var(--c-primary-deep);
   font-size: 26rpx;
-}
-
-.empty {
-  padding: 48rpx 0;
-  text-align: center;
+  margin-left: 24rpx;
 }
 
 .dog {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 20rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 2rpx solid var(--c-line);
 }
 
 .dog:last-child {
   border-bottom: none;
 }
 
-.dog-main {
-  display: flex;
-  align-items: center;
+.dog-text {
   flex: 1;
-}
-
-.thumb {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: #eee;
-  margin-right: 20rpx;
-}
-
-.thumb.placeholder {
-  line-height: 88rpx;
-  text-align: center;
-  font-size: 44rpx;
+  margin-left: 20rpx;
+  min-width: 0;
 }
 
 .dog-name {
   font-size: 30rpx;
 }
 
+.lost-flag {
+  margin-left: 12rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+  font-size: 22rpx;
+}
+
 .sub {
   font-size: 24rpx;
 }
 
-.link {
-  color: #1a6dd4;
-  font-size: 24rpx;
+.dog-ops {
+  display: flex;
+  flex-shrink: 0;
 }
 
-.link.off {
-  color: #b8b8b8;
+.walk {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid var(--c-line);
+}
+
+.walk:last-child {
+  border-bottom: none;
+}
+
+.walk.off .walk-title {
+  color: var(--c-muted);
+  text-decoration: line-through;
+}
+
+.walk-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.walk-title {
+  font-size: 28rpx;
+}
+
+.status {
+  flex-shrink: 0;
+  margin-left: 20rpx;
+  font-size: 24rpx;
+  color: var(--c-primary-deep);
 }

@@ -1,5 +1,69 @@
 <view class="container">
   <view wx:if="{{errMsg}}" class="banner-err">{{errMsg}}</view>
-  <view class="empty">「��还在建设中</view>
+  <view wx:if="{{loading}}" class="empty">加载中…</view>
+
+  <block wx:else>
+    <view wx:if="{{lostMode}}" class="banner-warn">{{lostHint}}</view>
+
+    <!-- 身份牌 -->
+    <view class="card tag-card">
+      <view class="dog-line">
+        <image wx:if="{{avatarFileID}}" class="avatar" src="{{avatarFileID}}" mode="aspectFill" />
+        <view wx:else class="avatar avatar-blank">🐶</view>
+        <text class="dog-name">{{dogName}}</text>
+      </view>
+
+      <image wx:if="{{qrFileID}}" class="qr" src="{{qrFileID}}" mode="widthFix" bindtap="onPreviewQr" />
+      <view wx:else class="empty">小程序码还没生成好</view>
+
+      <view wx:if="{{tagCode}}" class="tag-code">{{tagCode}}</view>
+      <view class="muted hint">{{hint}}</view>
+
+      <button class="btn-ghost block" loading="{{savingAlbum}}" bindtap="onSaveAlbum">保存到相册</button>
+      <button wx:if="{{needSetting}}" class="btn-ghost block" bindtap="onOpenSetting">去设置里打开相册权限</button>
+    </view>
+
+    <!-- 走失模式 -->
+    <view class="card">
+      <view class="field row">
+        <text class="section-title">走失模式</text>
+        <switch color="#ff8a3d" checked="{{lostMode}}" disabled="{{saving}}" bindchange="onToggleLost" />
+      </view>
+      <view class="muted hint">开了之后,路人扫这张牌会先看到「我走丢了」和你下面这句留言</view>
+      <view wx:if="{{!templateReady}}" class="banner-warn">{{noTemplateHint}}</view>
+
+      <block wx:if="{{lostMode}}">
+        <view class="field">
+          <text class="label">给路人的留言 <text class="muted">最多 {{noteMax}} 个字</text></text>
+          <textarea
+            class="textarea"
+            value="{{lostNote}}"
+            maxlength="{{noteMax}}"
+            placeholder="例:9 月 15 日在城北公园走丢,它怕生,别追,打个电话给我就行"
+            bindinput="onNoteInput"
+          />
+        </view>
+        <button class="btn-ghost block" loading="{{savingNote}}" bindtap="onSaveNote">更新留言</button>
+      </block>
+    </view>
+
+    <!-- 寻回留言 -->
+    <view class="card">
+      <view class="section-title">寻回留言</view>
+      <view wx:if="{{reportsLoading}}" class="muted">加载中…</view>
+      <view wx:elif="{{reports.length === 0}}" class="empty">{{emptyText}}</view>
+
+      <view wx:for="{{reports}}" wx:key="reportId" class="report">
+        <view class="muted time">{{item.timeText}}</view>
+        <view class="report-msg">{{item.message}}</view>
+        <text
+          wx:if="{{item.hasLocation}}"
+          class="link"
+          data-index="{{index}}"
+          bindtap="onOpenLocation"
+        >看位置</text>
+      </view>
+    </view>
+  </block>
 </view>
 <privacy-popup id="privacy-popup" />
