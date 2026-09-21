@@ -120,3 +120,4 @@ npm run deploy:shared        # 产出 dist/cloudfunctions/<fn>/,每个函数里�
 
 - `npm test` 覆盖所有云函数 core、页面逻辑、纯函数;云函数用 `tests/fakes/fake-db.js` 内存库,页面用 `tests/fakes/mini-runtime.js` 加载。
 - 并行开发按 `docs/dev-spec-2026-09-16.md` 的文件归属表切轨,派工包在 `docs/dispatch/`,`node scripts/check-dispatch.js` 校验它们不互相打架。
+- 上云之后怎么判「做成了没有」:见 `docs/deploy-acceptance.md`(上传前先跑 `node scripts/check-deploy-ready.js` 离线自检)。
