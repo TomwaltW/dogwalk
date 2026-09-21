@@ -34,7 +34,7 @@
   },
   "permission": {
     "scope.userLocation": {
-      "desc": "用于校验你是否在公园范围内完成签到,以及路人自愿附带走失狗的发现位置"
+      "desc": "用于公园签到范围校验及自愿提供走失狗发现位置"
     }
   },
   "requiredPrivateInfos": ["getLocation"],
