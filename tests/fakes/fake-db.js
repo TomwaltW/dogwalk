@@ -15,9 +15,17 @@
  *   - doc(id).update() 文档不存在时 resolve({stats:{updated:0}}),不 reject
  *   - doc(id).set()    upsert
  *   - 读出来的都是深拷贝,调用方改返回值不会污染库内数据
+ *   - get() 不带 limit 时最多回 100 条(服务端 SDK 的默认值),超出的静默丢掉;
+ *     limit 上限 1000。要取全请分页(cloudfunctions/_shared/db.js 的 getAll)
+ *   - 唯一索引:createFakeDb(seed, { unique: { dogs: ['tagCode'] } })。
+ *     写入时与库里已有文档撞值就 reject(缺字段按 null 算,两份 null 也算撞)。
+ *     只校验本次写到的字段 —— 种子数据里本来就重复的值不会让无关的 update 失败
  */
 
 let autoId = 0;
+
+const DEFAULT_GET_LIMIT = 100;
+const MAX_GET_LIMIT = 1000;
 
 function genId() {
   autoId += 1;
@@ -193,6 +201,49 @@ function applyUpdate(doc, data) {
   }
 }
 
+// ----------------------------------------------------------- 唯一索引
+
+/** 唯一索引眼里的值:缺字段 = null */
+function indexValue(doc, field) {
+  const v = getPath(doc, field);
+  return v === undefined ? null : v;
+}
+
+/**
+ * 把 nextRows(写入后的样子)与库里其他文档比,撞了就抛。
+ * written: 本次写到的字段名;null 表示整份文档(add / set)
+ */
+function assertUnique(store, name, nextRows, written) {
+  const fields = (store.__unique && store.__unique[name]) || [];
+  const rows = store[name] || [];
+  for (const field of fields) {
+    if (written && !written.some((k) => k === field || k.indexOf(field + '.') === 0)) continue;
+    nextRows.forEach(({ row, next }) => {
+      const v = indexValue(next, field);
+      const others = rows.filter((d) => d !== row);
+      const peers = nextRows.filter((x) => x.row !== row).map((x) => x.next);
+      if (others.concat(peers).some((d) => looseEqual(indexValue(d, field), v))) {
+        const e = new Error(
+          'fake-db: duplicate key on ' + name + '.' + field + ' = ' + JSON.stringify(v)
+        );
+        e.errCode = -502001;
+        throw e;
+      }
+    });
+  }
+}
+
+/** 先在副本上试写,过了唯一索引再落到库里 */
+function guardedUpdate(store, name, hit, data) {
+  const nextRows = hit.map((row) => {
+    const next = clone(row);
+    applyUpdate(next, data);
+    return { row, next };
+  });
+  assertUnique(store, name, nextRows, Object.keys(data));
+  hit.forEach((d) => applyUpdate(d, data));
+}
+
 // ------------------------------------------------------------- collection
 
 class Query {
@@ -246,7 +297,9 @@ class Query {
   }
 
   async get() {
-    return { data: this._resolve().map(clone) };
+    const hasLimit = this._state.limit !== null && this._state.limit !== undefined;
+    const cap = hasLimit ? Math.min(this._state.limit, MAX_GET_LIMIT) : DEFAULT_GET_LIMIT;
+    return { data: this._resolve().slice(0, cap).map(clone) };
   }
 
   async count() {
@@ -257,7 +310,7 @@ class Query {
   /** 批量更新命中的文档(云开发里只有服务端 SDK 支持) */
   async update({ data }) {
     const hit = this._resolve();
-    hit.forEach((d) => applyUpdate(d, data));
+    guardedUpdate(this._store, this._name, hit, data);
     return { stats: { updated: hit.length } };
   }
 
@@ -299,13 +352,19 @@ class Doc {
   async update({ data }) {
     const row = this._row();
     if (!row) return { stats: { updated: 0 } };
-    applyUpdate(row, data);
+    guardedUpdate(this._store, this._name, [row], data);
     return { stats: { updated: 1 } };
   }
 
   /** upsert */
   async set({ data }) {
     const row = this._row();
+    assertUnique(
+      this._store,
+      this._name,
+      [{ row, next: Object.assign({}, clone(data), { _id: this._id }) }],
+      null
+    );
     if (row) {
       Object.keys(row).forEach((k) => {
         if (k !== '_id') delete row[k];
@@ -339,6 +398,7 @@ class Collection extends Query {
   async add({ data }) {
     if (!this._store[this._name]) this._store[this._name] = [];
     const _id = data && data._id !== undefined ? data._id : genId();
+    assertUnique(this._store, this._name, [{ row: null, next: Object.assign({}, data, { _id }) }], null);
     this._store[this._name].push(Object.assign({}, clone(data), { _id }));
     return { _id };
   }
@@ -348,10 +408,13 @@ class Collection extends Query {
 
 /**
  * @param {Object<string, Array<object>>} [seed]  集合名 -> 初始文档数组
+ * @param {{unique?: Object<string, string[]>}} [opts]  集合名 -> 唯一索引字段
  * @returns {{db: object, _: object, dump: (coll:string)=>Array<object>}}
  */
-function createFakeDb(seed) {
+function createFakeDb(seed, opts) {
   const store = {};
+  // 不可枚举:不会被当成集合名
+  Object.defineProperty(store, '__unique', { value: (opts && opts.unique) || {} });
   for (const name of Object.keys(seed || {})) {
     store[name] = (seed[name] || []).map((d, i) =>
       Object.assign({}, clone(d), { _id: d._id === undefined ? name + '_' + i : d._id })

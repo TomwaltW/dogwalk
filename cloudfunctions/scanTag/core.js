@@ -11,11 +11,10 @@
 // 路人只能留言(reportFound),主人靠订阅消息与身份牌页的留言列表看到。
 // 每次扫码写一条 scanLogs。
 
-const { COLL, TAG_CODE_LENGTH } = require('../_shared/contracts');
+const { COLL } = require('../_shared/contracts');
 const { ok, fail, CODES } = require('../_shared/errors');
-
-// 短码格式:长度取契约常量,不写字面量。字符集 [a-z0-9]。
-const TAG_CODE_RE = new RegExp('^[a-z0-9]{' + TAG_CODE_LENGTH + '}$');
+// 短码格式(长度取契约常量)与 reportFound / genTagCode 共用一份
+const { TAG_CODE_RE } = require('../_shared/tagcode');
 
 /**
  * dogs 文档 → DogPublic(spec 3.2.3)。字段逐个挑,恰好 9 个,只能少不能多:

@@ -11,13 +11,20 @@
 
 const { COLL, SIZE_CLASS, GENDER, TAGS, LIMITS } = require('../_shared/contracts');
 const { CODES, fail, ok } = require('../_shared/errors');
+const { charLength } = require('../_shared/text');
+const { pickUniqueCode } = require('../_shared/tagcode');
 
 const BIRTH_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/; // 'YYYY-MM'
+/**
+ * 头像只收云存储 fileID(wx.cloud.uploadFile 的返回值)。外链 URL 下载不下来,
+ * 内容安全会「调用失败 → 放行」,等于绕过图片审核,所以在字段校验这一步就挡掉。
+ */
+const CLOUD_FILE_PREFIX = 'cloud://';
 
 /**
  * 客户端能写的 12 个字段(spec 3.3.2)。刻意排除:
  *   _id / ownerOpenid      —— 由服务端定,否则可以冒名建狗、改别人家的狗归属
- *   tagCode / qrFileID     —— 狗牌由 genTagCode 生成,tagCode 全局唯一,放开写等于放开抢码
+ *   tagCode / qrFileID     —— 服务端发(create 发码,genTagCode 生成小程序码),tagCode 全局唯一,放开写等于放开抢码
  *   createdAt / updatedAt  —— 一律取 ctx.now()
  */
 const WRITABLE = [
@@ -62,17 +69,6 @@ const BOOL_FIELDS = ['neutered', 'vaccinated', 'lostMode'];
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-/**
- * 字符数按码位算 —— 'a'.length 和 '🐶'.length 不一样,中文名和 emoji 名
- * 都得按人眼看到的字数来数,否则「12 字符」这条线会错位。
- *
- * @param {string} s
- * @returns {number}
- */
-function charLength(s) {
-  return Array.from(String(s)).length;
 }
 
 /** 数组且每项都在 allowed 里 */
@@ -121,7 +117,15 @@ function validateDog(dog, opts) {
   for (const k of Object.keys(TEXT_MAX)) {
     if (has(k) && (typeof dog[k] !== 'string' || charLength(dog[k]) > TEXT_MAX[k])) return k;
   }
-  if (has('avatarFileID') && typeof dog.avatarFileID !== 'string') return 'avatarFileID';
+  if (
+    has('avatarFileID') &&
+    !(
+      dog.avatarFileID === '' ||
+      (typeof dog.avatarFileID === 'string' && dog.avatarFileID.indexOf(CLOUD_FILE_PREFIX) === 0)
+    )
+  ) {
+    return 'avatarFileID';
+  }
   if (has('tags') && !isSubsetOf(dog.tags, TAGS)) return 'tags';
   for (const k of BOOL_FIELDS) {
     if (has(k) && typeof dog[k] !== 'boolean') return k;
@@ -198,10 +202,15 @@ async function actionCreate(event, ctx) {
   const risky = await checkContent(patch, null, ctx);
   if (risky) return fail(CODES.CONTENT_RISKY, risky);
 
+  // 建狗即发码:dogs.tagCode 有唯一索引,不能让新狗都顶着 '' 入库(见 _shared/tagcode.js)。
+  // 小程序码图片仍由 genTagCode 在进身份牌页时生成。
+  const tagCode = await pickUniqueCode(ctx.db);
+  if (!tagCode) return fail(CODES.INTERNAL, 'tagCode generate failed');
+
   const now = ctx.now();
   const doc = Object.assign({}, DEFAULTS, patch, {
     ownerOpenid: ctx.openid,
-    tagCode: '',
+    tagCode,
     qrFileID: '',
     createdAt: now,
     updatedAt: now,

@@ -11,6 +11,8 @@
 const { COLL, LIMITS, TEMPLATE_KEYS } = require('../_shared/contracts');
 const { isLatLng } = require('../_shared/geo');
 const { ok, fail, CODES } = require('../_shared/errors');
+const { CST_OFFSET_MS, charLength, headChars } = require('../_shared/text');
+const { TAG_CODE_RE } = require('../_shared/tagcode');
 
 /**
  * 「寻回留言」订阅消息模板的字段名。
@@ -20,21 +22,9 @@ const { ok, fail, CODES } = require('../_shared/errors');
  */
 const TEMPLATE_FIELDS = { name: 'thing1', message: 'thing2', time: 'time3' };
 
-const TAG_CODE_RE = /^[a-z0-9]{6}$/;
 const TEMPLATE_KEY = TEMPLATE_KEYS.FOUND_REPORT;
 /** 订阅消息 thing 类字段有长度限制,留言只带个开头,详情让主人点进小程序看 */
 const MSG_PREVIEW_MAX = 20;
-const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
-
-/** 字符数按码位算 —— emoji 留言不该被当成两个字 */
-function charLength(s) {
-  return Array.from(String(s)).length;
-}
-
-/** 取前 n 个码位,不从 emoji 中间切断 */
-function headChars(s, n) {
-  return Array.from(String(s)).slice(0, n).join('');
-}
 
 /**
  * 东八区的 'YYYY-MM-DD HH:mm'。
@@ -84,7 +74,7 @@ function normalizeLatLng(lat, lng) {
  * 给主人发「寻回留言」订阅消息。
  *
  * spec 3.4:额度为 0 或没记过模板 id 都**不是错误**,静默跳过;
- * send 抛错记 logger.error、不扣额度、主流程仍 ok。发成功才扣 1 条。
+ * 额度先原子地占 1 条再发;send 抛错就退回额度、记 logger.error,主流程仍 ok。
  *
  * @param {object} dog     dogs 文档
  * @param {string} message 路人的留言原文
@@ -102,10 +92,16 @@ async function notifyOwner(dog, message, ctx) {
   }
   if (!owner) return false;
 
-  const quota = owner.subQuota && owner.subQuota[TEMPLATE_KEY];
   const templateId = owner.subTemplates && owner.subTemplates[TEMPLATE_KEY];
-  if (!(typeof quota === 'number' && quota > 0)) return false;
   if (typeof templateId !== 'string' || templateId === '') return false;
+
+  // 先占额度再发:条件更新「额度 > 0 才扣 1」是原子的,两个路人同时留言
+  // 也只有一个能占到最后一条,额度不会被扣成负数。没占到就是没额度,静默跳过。
+  const quotaPath = 'subQuota.' + TEMPLATE_KEY;
+  const taken = await users
+    .where({ _id: dog.ownerOpenid, [quotaPath]: ctx._.gt(0) })
+    .update({ data: { [quotaPath]: ctx._.inc(-1) } });
+  if (!(taken && taken.stats && taken.stats.updated)) return false;
 
   try {
     await ctx.openapi.subscribeMessage.send({
@@ -119,7 +115,8 @@ async function notifyOwner(dog, message, ctx) {
       },
     });
   } catch (e) {
-    // spec 3.4:openapi 失败不影响主流程,也不扣额度(没发出去凭什么扣)
+    // spec 3.4:openapi 失败不影响主流程,也不扣额度(没发出去凭什么扣)—— 把占的那条还回去
+    await users.doc(dog.ownerOpenid).update({ data: { [quotaPath]: ctx._.inc(1) } });
     if (ctx.logger && ctx.logger.error) {
       ctx.logger.error('reportFound: 订阅消息发送失败', {
         dogId: dog._id,
@@ -129,9 +126,6 @@ async function notifyOwner(dog, message, ctx) {
     return false;
   }
 
-  await users.doc(dog.ownerOpenid).update({
-    data: { ['subQuota.' + TEMPLATE_KEY]: ctx._.inc(-1) },
-  });
   return true;
 }
 

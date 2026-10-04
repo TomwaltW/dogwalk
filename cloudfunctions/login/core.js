@@ -11,6 +11,7 @@
 
 const { COLL } = require('../_shared/contracts');
 const { CODES, fail, ok } = require('../_shared/errors');
+const { ensureUser } = require('../_shared/users');
 
 const NICKNAME_MAX = 20; // 微信昵称上限口径,与前端保持一致
 
@@ -63,31 +64,11 @@ module.exports = async function core(event, ctx) {
     const now = ctx.now();
     const patch = profilePatch(e.profile);
 
-    // users 的 _id 即 _openid(spec 3.2.2)。doc(id).get() 在文档不存在时是
-    // reject 而不是 resolve(null),所以判存在走 where 更省事。
-    const found = await users.where({ _openid: openid }).get();
-    let user = found.data[0];
+    // 文档形状归 _shared/users.js 管(subscribeGrant 也可能先一步建档)
+    const ensured = await ensureUser(ctx, patch);
+    let user = ensured.user;
 
-    if (!user) {
-      const doc = Object.assign(
-        {
-          _openid: openid,
-          // 跨端身份,口径见 _shared/runtime.js 的 handler 注释:
-          // 只记录不夺权,没绑开放平台时是空串,不影响本端任何逻辑。
-          unionid: ctx.unionid || '',
-          nickname: '',
-          avatarFileID: '',
-          subQuota: {},
-          subTemplates: {},
-          status: 'normal',
-          createdAt: now,
-          updatedAt: now,
-        },
-        patch
-      );
-      await users.doc(openid).set({ data: doc });
-      user = Object.assign({ _id: openid }, doc);
-    } else {
+    if (!ensured.created) {
       // 绑定开放平台之前注册的老用户,这里自动补上 unionid ——
       // 绑定那天不需要做数据迁移,人回来登录一次就补齐了。
       if (ctx.unionid && user.unionid !== ctx.unionid) patch.unionid = ctx.unionid;

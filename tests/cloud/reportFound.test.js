@@ -328,3 +328,16 @@ describe('reportFound: 内容安全与失败面(spec 3.4)', () => {
     });
   });
 });
+
+describe('reportFound: 额度并发', () => {
+  test('只剩 1 条额度时两个路人同时留言:只发一条,额度扣到 0 不会变负', async () => {
+    const { ctx, calls, dump } = setup();
+    const [a, b] = await Promise.all([core(EVENT, ctx), core(EVENT, ctx)]);
+
+    expect(a.ok && b.ok).toBe(true);
+    expect([a.data.notified, b.data.notified].filter(Boolean)).toHaveLength(1);
+    expect(calls.subscribe).toHaveLength(1);
+    expect(dump(COLL.USERS)[0].subQuota[KEY]).toBe(0);
+    expect(dump(COLL.FOUND_REPORTS)).toHaveLength(2); // 两条留言都落库
+  });
+});

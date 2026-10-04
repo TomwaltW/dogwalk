@@ -258,3 +258,18 @@ describe('genTagCode: 失败面(spec 3.4)', () => {
     expect(calls.wxacode).toHaveLength(0);
   });
 });
+
+describe('genTagCode: 并发补码', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('两次并发给同一只老狗补码:返回同一个码,且就是库里那个', async () => {
+    queueCodes(['aaaaaa', 'bbbbbb']);
+    const { ctx, dump } = setup();
+    const [r1, r2] = await Promise.all([core({ dogId: 'd1' }, ctx), core({ dogId: 'd1' }, ctx)]);
+
+    expect(r1.ok && r2.ok).toBe(true);
+    const stored = dump(COLL.DOGS)[0].tagCode;
+    expect(r1.data.tagCode).toBe(stored);
+    expect(r2.data.tagCode).toBe(stored);
+  });
+});

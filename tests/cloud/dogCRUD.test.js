@@ -14,6 +14,7 @@
 const core = require('../../cloudfunctions/dogCRUD/core');
 const { makeTestCtx, DEFAULT_NOW } = require('../fakes/cloud-ctx');
 const { COLL, TAGS, LIMITS } = require('../../cloudfunctions/_shared/contracts');
+const { TAG_CODE_RE } = require('../../cloudfunctions/_shared/tagcode');
 
 const NOW_MS = new Date(DEFAULT_NOW).getTime();
 
@@ -130,9 +131,10 @@ describe('dogCRUD: create', () => {
       tags: [],
       lostMode: false,
       lostNote: '',
-      tagCode: '',
       qrFileID: '',
     });
+    // 建狗即发码(dogs.tagCode 有唯一索引,不能顶着 '' 入库)
+    expect(r.data.tagCode).toMatch(TAG_CODE_RE);
     expect(r.data.createdAt.getTime()).toBe(NOW_MS);
     expect(r.data.updatedAt.getTime()).toBe(NOW_MS);
   });
@@ -159,7 +161,32 @@ describe('dogCRUD: create', () => {
     expect(r.ok).toBe(true);
     expect(r.data.ownerOpenid).toBe('o1');
     expect(r.data._id).not.toBe('forged');
-    expect(r.data.tagCode).toBe('');
+    expect(r.data.tagCode).not.toBe('abc123');
+    expect(r.data.tagCode).toMatch(TAG_CODE_RE);
+  });
+
+  test('多只狗都没进过身份牌页也能连续建档(tagCode 唯一索引不撞 \'\')', async () => {
+    const { ctx, dump } = setup();
+    for (let i = 0; i < 3; i += 1) {
+      const r = await core({ action: 'create', dog: makeDog() }, ctx);
+      expect(r.ok).toBe(true);
+    }
+    const codes = dump(COLL.DOGS).map((d) => d.tagCode);
+    expect(new Set(codes).size).toBe(3);
+    codes.forEach((c) => expect(c).toMatch(TAG_CODE_RE));
+  });
+
+  test('avatarFileID 只收云存储 fileID,外链 URL 报 INVALID_PARAM 且不送审', async () => {
+    const { ctx, dump } = setup();
+    for (const bad of ['https://evil.example/x.png', 'http://a/b.png', 'wxfile://tmp.png', 123]) {
+      const r = await core({ action: 'create', dog: makeDog({ avatarFileID: bad }) }, ctx);
+      expect(r).toMatchObject({ ok: false, code: 'INVALID_PARAM', msg: 'avatarFileID' });
+    }
+    expect(dump(COLL.DOGS)).toHaveLength(0);
+
+    const ok1 = await core({ action: 'create', dog: makeDog({ avatarFileID: '' }) }, ctx);
+    const ok2 = await core({ action: 'create', dog: makeDog({ avatarFileID: 'cloud://env/a.png' }) }, ctx);
+    expect(ok1.ok && ok2.ok).toBe(true);
   });
 
   test('create 不带 dog 返回 INVALID_PARAM dog', async () => {

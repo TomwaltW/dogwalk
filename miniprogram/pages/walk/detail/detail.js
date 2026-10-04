@@ -16,6 +16,7 @@ const {
 } = require('../../../logic/enums');
 const fmt = require('../format');
 const { errText } = require('../errors');
+const clock = require('../clock');
 
 /** 各种「只能看不能动」的状态下给一句话,免得用户对着灰按钮猜 */
 const NOTICE = {
@@ -23,6 +24,18 @@ const NOTICE = {
   rejected: '发起人婉拒了这次申请,看看别的约遛吧',
   left: '你已经退出这次约遛了',
 };
+/** 退出后约遛还没开始:服务端允许重新申请(walkOps join,spec 第 9 节假设 7) */
+const NOTICE_LEFT_REJOIN = '你已经退出这次约遛了,想去的话可以重新申请';
+const NOTICE_STARTED = '这次约遛已经开始了,不能再申请';
+/** walkOps join 对已开始 / 已取消的约遛回 CONFLICT 'walk closed' */
+const MSG_WALK_CLOSED = 'walk closed';
+
+/** 顶部那句提示:退出后还能回来就告诉用户;没参与的人碰上已开始的约遛也说一声 */
+function noticeOf(myStatus, canJoin, started) {
+  if (myStatus === 'left' && canJoin) return NOTICE_LEFT_REJOIN;
+  if (NOTICE[myStatus]) return NOTICE[myStatus];
+  return myStatus === 'none' && started ? NOTICE_STARTED : '';
+}
 
 /**
  * DogCard -> 视图。原始的 sizeClass / tags 留着,合拍度规则要用;
@@ -174,8 +187,12 @@ const options = {
     const myStatus = walk.myStatus || 'none';
     const isHost = myStatus === 'host';
     const cancelled = walk.status === 'cancelled';
+    // 已经开始的约遛不收新申请(与 walkOps join 同一条线:startAt <= 现在)
+    const started = Date.parse(walk.startAt) <= Date.parse(clock.nowIso());
     // 被婉拒 / 已退出的人只能看;约遛取消后谁都不能动
     const readonly = cancelled || myStatus === 'rejected' || myStatus === 'left';
+    // 申请入口:没申请过的,或者退出后想回来的(服务端允许,假设 7);被婉拒的不行
+    const canJoin = !cancelled && !started && (myStatus === 'none' || myStatus === 'left');
 
     const hostDogs = (walk.hostDogs || []).map((d) => toDogView(d));
     const members = ((detail && detail.members) || []).map(toMemberView);
@@ -217,7 +234,7 @@ const options = {
       hasWarnHint: compatHints.some((h) => h.level === 'warn'),
 
       readonly,
-      canJoin: !readonly && myStatus === 'none',
+      canJoin,
       canCancelJoin: !readonly && myStatus === 'pending',
       canLeave: !readonly && myStatus === 'approved',
       canCancelWalk: !readonly && isHost,
@@ -226,7 +243,7 @@ const options = {
       // 留言已经存在就让人看得到,哪怕自己已经退出了
       showMessages: messages.length > 0 || isHost || myStatus === 'approved',
 
-      noticeText: NOTICE[myStatus] || '',
+      noticeText: noticeOf(myStatus, canJoin, started && !cancelled && !isHost),
       cancelledText: cancelled ? '这次约遛已取消' : '',
     });
   },
@@ -279,9 +296,11 @@ const options = {
       this.setData({ picking: false });
       await this.load();
     } catch (e) {
+      // CONFLICT 有两种:约遛已开始/取消('walk closed'),或已经有一条申请。别把前者说成后者
+      const closed = e && e.code === 'CONFLICT' && e.message === MSG_WALK_CLOSED;
       this.setData({
         errMsg: errText(e, {
-          CONFLICT: '你已经申请过这场了,等发起人确认',
+          CONFLICT: closed ? '这次约遛已经开始或取消了,看看别的吧' : '你已经申请过这场了,等发起人确认',
           FORBIDDEN: '这是你自己发起的约遛,不用再申请',
         }),
       });

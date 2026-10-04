@@ -265,16 +265,45 @@ describe('约遛详情 —— pending / approved(B12)', () => {
     expect(api.leaveWalk).not.toHaveBeenCalled();
   });
 
-  test('rejected / left —— 只读,一句提示,不给申请入口', async () => {
+  test('rejected —— 只读,一句提示,不给申请入口', async () => {
     const rejected = await open(detail({ walk: summary({ myStatus: 'rejected' }) }));
     expect(rejected.data.readonly).toBe(true);
     expect(rejected.data.canJoin).toBe(false);
     expect(rejected.data.noticeText).not.toBe('');
+  });
 
+  test('left —— 其余只读,但约遛没开始就能重新申请(与 walkOps 假设 7 一致)', async () => {
     const left = await open(detail({ walk: summary({ myStatus: 'left' }) }));
     expect(left.data.readonly).toBe(true);
+    expect(left.data.canJoin).toBe(true);
+    expect(left.data.canLeave).toBe(false);
+    expect(left.data.canSend).toBe(false);
+    expect(left.data.noticeText).toMatch(/重新申请/);
+  });
+
+  test('已经开始的约遛不给申请入口(none / left 都一样)', async () => {
+    const past = { startAt: '2026-09-16T01:00:00.000Z' }; // 早于 NOW
+    const none = await open(detail({ walk: summary(Object.assign({ myStatus: 'none' }, past)) }));
+    expect(none.data.canJoin).toBe(false);
+    expect(none.data.noticeText).toMatch(/已经开始/);
+
+    const left = await open(detail({ walk: summary(Object.assign({ myStatus: 'left' }, past)) }));
     expect(left.data.canJoin).toBe(false);
-    expect(left.data.noticeText).not.toBe('');
+    expect(left.data.noticeText).not.toMatch(/重新申请/);
+  });
+
+  test('申请时服务端回 CONFLICT walk closed:说约遛已开始,不说「已经申请过」', async () => {
+    const page = await open(detail({ myDogs: [card({ dogId: 'mine1' })] }));
+    page.onTapJoin();
+    page.onPickDog({ currentTarget: { dataset: { id: 'mine1' } } });
+    const err = new Error('walk closed');
+    err.code = 'CONFLICT';
+    api.joinWalk.mockRejectedValue(err);
+
+    await page.onConfirmJoin();
+
+    expect(page.data.errMsg).toMatch(/已经开始或取消/);
+    expect(page.data.errMsg).not.toMatch(/已经申请过/);
   });
 });
 
