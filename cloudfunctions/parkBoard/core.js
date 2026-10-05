@@ -12,8 +12,10 @@
 
 const { CODES, fail, ok } = require('../_shared/errors');
 const { COLL } = require('../_shared/contracts');
-
-const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
+const { toDogCard } = require('../_shared/cards');
+const { CST_OFFSET_MS } = require('../_shared/text');
+// 结果集可能过 100 条的查询走 getAll —— 裸 get() 会被服务端静默截到 100 条,在场狗数就少算了
+const { getAll } = require('../_shared/db');
 
 /**
  * 东八区「今天 00:00」对应的 UTC 时刻(spec 9.5)。
@@ -26,17 +28,6 @@ const CST_OFFSET_MS = 8 * 60 * 60 * 1000;
 function cstDayStart(now) {
   const dayStr = new Date(now.getTime() + CST_OFFSET_MS).toISOString().slice(0, 10);
   return new Date(new Date(dayStr + 'T00:00:00.000Z').getTime() - CST_OFFSET_MS);
-}
-
-/** spec 3.2.3 DogCard —— 恰好 5 个 key,一个都不能多 */
-function toDogCard(dog) {
-  return {
-    dogId: dog._id,
-    name: dog.name || '',
-    avatarFileID: dog.avatarFileID || '',
-    sizeClass: dog.sizeClass || '',
-    tags: Array.isArray(dog.tags) ? dog.tags.slice() : [],
-  };
 }
 
 /** spec 3.2.3 ParkSummary —— 公园自身坐标是公开数据,允许出现 */
@@ -76,7 +67,7 @@ function activeWhere(ctx, now, extra) {
 async function loadDogIndex(ctx, ids) {
   const index = {};
   if (ids.length === 0) return index;
-  const res = await ctx.db.collection(COLL.DOGS).where({ _id: ctx._.in(ids) }).get();
+  const res = await getAll(ctx.db.collection(COLL.DOGS).where({ _id: ctx._.in(ids) }));
   (res.data || []).forEach((d) => {
     index[d._id] = d;
   });
@@ -90,11 +81,11 @@ function toCards(ids, dogIndex) {
 
 /** 无 parkId:所有 active 公园 + 各自的在场狗数 */
 async function listParks(ctx, now) {
-  const parksRes = await ctx.db.collection(COLL.PARKS).where({ active: true }).get();
+  const parksRes = await getAll(ctx.db.collection(COLL.PARKS).where({ active: true }));
   const parks = parksRes.data || [];
   if (parks.length === 0) return ok([]);
 
-  const checkinsRes = await ctx.db.collection(COLL.CHECKINS).where(activeWhere(ctx, now)).get();
+  const checkinsRes = await getAll(ctx.db.collection(COLL.CHECKINS).where(activeWhere(ctx, now)));
   const byPark = {};
   (checkinsRes.data || []).forEach((c) => {
     if (!byPark[c.parkId]) byPark[c.parkId] = [];
@@ -114,14 +105,15 @@ async function board(ctx, now, parkId) {
   const checkins = ctx.db.collection(COLL.CHECKINS);
 
   // 在场:排最近签到的在前,与 todayDogs 同一把尺子
-  const activeRes = await checkins.where(activeWhere(ctx, now, { parkId: parkId })).orderBy('startAt', 'desc').get();
+  const activeRes = await getAll(
+    checkins.where(activeWhere(ctx, now, { parkId: parkId })).orderBy('startAt', 'desc')
+  );
   const active = activeRes.data || [];
 
   // 今天来过:**不看 status**,已签退的也算(spec 9.5),按最近签到时间倒序
-  const todayRes = await checkins
-    .where({ parkId: parkId, startAt: ctx._.gte(cstDayStart(now)) })
-    .orderBy('startAt', 'desc')
-    .get();
+  const todayRes = await getAll(
+    checkins.where({ parkId: parkId, startAt: ctx._.gte(cstDayStart(now)) }).orderBy('startAt', 'desc')
+  );
   const today = todayRes.data || [];
 
   const activeIds = dogIdsOf(active);

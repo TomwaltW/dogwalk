@@ -129,12 +129,27 @@ describe('subscribeGrant: 失败面(spec 3.4)', () => {
     expect(res).toEqual({ ok: false, code: 'AUTH_REQUIRED', msg: 'AUTH_REQUIRED' });
   });
 
-  test('users 文档不存在 → NOT_FOUND users(没登录过就没账本)', async () => {
+  test('没点过登录(users 文档不存在)也记得上额度:按 login 的形状建档', async () => {
     const { ctx, dump } = setup({ seed: { users: [] } });
     const res = await core({ templateKey: KEY, templateId: 'tpl-001' }, ctx);
 
-    expect(res).toMatchObject({ ok: false, code: 'NOT_FOUND', msg: COLL.USERS });
-    expect(dump(COLL.USERS)).toHaveLength(0); // 不顺手建文档
+    expect(res).toEqual({ ok: true, data: { remaining: 1 } });
+    const users = dump(COLL.USERS);
+    expect(users).toHaveLength(1);
+    expect(users[0]).toMatchObject({
+      _id: ctx.openid,
+      _openid: ctx.openid,
+      status: 'normal',
+      subQuota: { [KEY]: 1 },
+      subTemplates: { [KEY]: 'tpl-001' },
+    });
+
+    // 之后再点登录,额度原样保留
+    const login = require('../../cloudfunctions/login/core');
+    const lr = await login({}, ctx);
+    expect(lr.ok).toBe(true);
+    expect(lr.data.user.subQuota[KEY]).toBe(1);
+    expect(dump(COLL.USERS)).toHaveLength(1);
   });
 
   test('event 缺省不抛异常', async () => {

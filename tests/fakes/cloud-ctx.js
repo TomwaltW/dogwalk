@@ -23,6 +23,8 @@ const { createFakeDb } = require('./fake-db');
 const { fixedClock } = require('./clock');
 
 const DEFAULT_NOW = '2026-09-16T10:00:00+08:00';
+/** 与 database/indexes.md 里标了「唯一 = 是」的索引保持一致 */
+const DEFAULT_UNIQUE = { dogs: ['tagCode'] };
 
 /**
  * @param {object} [opts]
@@ -34,11 +36,14 @@ const DEFAULT_NOW = '2026-09-16T10:00:00+08:00';
  * @param {string[]} [opts.riskyImages]  命中即图片不安全的 fileID
  * @param {object} [opts.openapi]
  * @param {object} [opts.logger]
+ * @param {Object<string,string[]>} [opts.unique]  唯一索引;缺省与 database/indexes.md 一致(dogs.tagCode)
  * @returns {{ctx: object, db: object, _: object, dump: Function, calls: object}}
  */
 function makeTestCtx(opts) {
   const o = opts || {};
-  const { db, _, dump } = createFakeDb(o.seed || {});
+  const { db, _, dump } = createFakeDb(o.seed || {}, {
+    unique: o.unique || DEFAULT_UNIQUE,
+  });
   const risky = o.risky || [];
   const riskyImages = o.riskyImages || [];
 

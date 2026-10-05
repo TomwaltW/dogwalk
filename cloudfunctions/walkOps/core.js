@@ -10,6 +10,9 @@
 
 const { COLL, LIMITS, WALK_STATUS, MEMBER_STATUS } = require('../_shared/contracts');
 const { CODES, fail, ok } = require('../_shared/errors');
+const { toDogCard } = require('../_shared/cards');
+// 结果集可能过 100 条的查询走 getAll —— 裸 get() 会被服务端静默截到 100 条
+const { getAll } = require('../_shared/db');
 
 // 状态字面量从 3.2.1 的枚举里取,免得和契约漂移
 const [WALK_OPEN, WALK_CANCELLED] = WALK_STATUS;
@@ -52,19 +55,7 @@ function dayRangeMs(date) {
 
 // ------------------------------------------------------------ 形状转换
 
-/**
- * DogCard —— 恰好五个 key(spec 3.2.3)。
- * 任何面向其他用户的狗展示都必须过这里,狗文档里的 ownerOpenid / breed / tagCode 等一律不外泄。
- */
-function toDogCard(dog) {
-  return {
-    dogId: dog._id,
-    name: dog.name,
-    avatarFileID: dog.avatarFileID || '',
-    sizeClass: dog.sizeClass,
-    tags: Array.isArray(dog.tags) ? dog.tags : [],
-  };
-}
+// DogCard(spec 3.2.3)只在 _shared/cards.js 定义一份,任何面向其他用户的狗都过 toDogCard。
 
 /** 按给定的 id 顺序转 DogCard;狗文档不在了(被主人删了)就跳过 */
 function cardsFrom(dogMap, dogIds) {
@@ -97,10 +88,7 @@ function makeWalkSummary(walk, extra) {
 async function fetchByIds(ctx, coll, ids) {
   const uniq = unique(ids.filter((v) => typeof v === 'string' && v));
   if (!uniq.length) return new Map();
-  const r = await ctx.db
-    .collection(coll)
-    .where({ _id: ctx._.in(uniq) })
-    .get();
+  const r = await getAll(ctx.db.collection(coll).where({ _id: ctx._.in(uniq) }));
   return new Map(r.data.map((d) => [d._id, d]));
 }
 
@@ -152,24 +140,32 @@ function countApproved(rows, walkId) {
  * parkName / hostDogs / dogCount 与库一致,isHost / myStatus 按调用者算。
  * 狗数按文档里记的 dogIds 算(狗被删了也不该凭空腾出名额),hostDogs 只列还在的。
  */
-async function toWalkSummaries(walks, ctx) {
+async function toWalkSummaries(walks, ctx, knownMembers) {
   if (!walks.length) return [];
 
   const walkIds = walks.map((w) => w._id);
   const hostDogIds = [];
   walks.forEach((w) => hostDogIds.push(...(w.dogIds || [])));
 
-  const [parkMap, dogMap, approved, mine] = await Promise.all([
+  // 调用方已经拿到这些 walk 的全部成员行(actionGet)就直接用,不再回库查两次
+  const members = knownMembers
+    ? Promise.resolve({
+        approved: { data: knownMembers.filter((m) => m.status === APPROVED) },
+        mine: { data: knownMembers.filter((m) => m.openid === ctx.openid) },
+      })
+    : Promise.all([
+        getAll(
+          ctx.db.collection(COLL.WALK_MEMBERS).where({ walkId: ctx._.in(walkIds), status: APPROVED })
+        ),
+        getAll(
+          ctx.db.collection(COLL.WALK_MEMBERS).where({ walkId: ctx._.in(walkIds), openid: ctx.openid })
+        ),
+      ]).then(([approved, mine]) => ({ approved, mine }));
+
+  const [parkMap, dogMap, { approved, mine }] = await Promise.all([
     fetchByIds(ctx, COLL.PARKS, walks.map((w) => w.parkId)),
     fetchByIds(ctx, COLL.DOGS, hostDogIds),
-    ctx.db
-      .collection(COLL.WALK_MEMBERS)
-      .where({ walkId: ctx._.in(walkIds), status: APPROVED })
-      .get(),
-    ctx.db
-      .collection(COLL.WALK_MEMBERS)
-      .where({ walkId: ctx._.in(walkIds), openid: ctx.openid })
-      .get(),
+    members,
   ]);
 
   return walks.map((w) => {
@@ -267,7 +263,7 @@ async function listOpen(event, ctx, nowMs) {
   const where = { status: WALK_OPEN, startAt };
   if (event.parkId) where.parkId = event.parkId;
 
-  const r = await ctx.db.collection(COLL.WALKS).where(where).orderBy('startAt', 'asc').get();
+  const r = await getAll(ctx.db.collection(COLL.WALKS).where(where).orderBy('startAt', 'asc'));
   return r.data;
 }
 
@@ -275,15 +271,15 @@ async function listOpen(event, ctx, nowMs) {
 async function listMine(ctx, nowMs) {
   const since = new Date(nowMs - MINE_WINDOW_MS);
 
-  const hosted = await ctx.db
-    .collection(COLL.WALKS)
-    .where({ hostOpenid: ctx.openid, startAt: ctx._.gt(since) })
-    .get();
+  const hosted = await getAll(
+    ctx.db.collection(COLL.WALKS).where({ hostOpenid: ctx.openid, startAt: ctx._.gt(since) })
+  );
 
-  const rows = await ctx.db
-    .collection(COLL.WALK_MEMBERS)
-    .where({ openid: ctx.openid, status: ctx._.in([PENDING, APPROVED]) })
-    .get();
+  const rows = await getAll(
+    ctx.db
+      .collection(COLL.WALK_MEMBERS)
+      .where({ openid: ctx.openid, status: ctx._.in([PENDING, APPROVED]) })
+  );
 
   // 我 host 的那些已经在上一批里了,别重复
   const joinedIds = unique(rows.data.map((m) => m.walkId)).filter(
@@ -291,10 +287,9 @@ async function listMine(ctx, nowMs) {
   );
   const joined = joinedIds.length
     ? (
-        await ctx.db
-          .collection(COLL.WALKS)
-          .where({ _id: ctx._.in(joinedIds), startAt: ctx._.gt(since) })
-          .get()
+        await getAll(
+          ctx.db.collection(COLL.WALKS).where({ _id: ctx._.in(joinedIds), startAt: ctx._.gt(since) })
+        )
       ).data
     : [];
 
@@ -326,11 +321,9 @@ async function actionGet(event, ctx) {
 
   const isHost = walk.hostOpenid === ctx.openid;
   const rows = (
-    await ctx.db
-      .collection(COLL.WALK_MEMBERS)
-      .where({ walkId: walk._id })
-      .orderBy('createdAt', 'asc')
-      .get()
+    await getAll(
+      ctx.db.collection(COLL.WALK_MEMBERS).where({ walkId: walk._id }).orderBy('createdAt', 'asc')
+    )
   ).data;
   const myRow = rows.find((m) => m.openid === ctx.openid);
 
@@ -354,11 +347,9 @@ async function actionGet(event, ctx) {
   let messages = [];
   if (isHost || (myRow && myRow.status === APPROVED)) {
     const raw = (
-      await ctx.db
-        .collection(COLL.MESSAGES)
-        .where({ walkId: walk._id })
-        .orderBy('createdAt', 'asc')
-        .get()
+      await getAll(
+        ctx.db.collection(COLL.MESSAGES).where({ walkId: walk._id }).orderBy('createdAt', 'asc')
+      )
     ).data;
     const msgDogMap = await fetchByIds(ctx, COLL.DOGS, raw.map((m) => m.dogId));
     messages = raw.map((m) => {
@@ -381,7 +372,7 @@ async function actionGet(event, ctx) {
       .get()
   ).data.map(toDogCard);
 
-  const summaries = await toWalkSummaries([walk], ctx);
+  const summaries = await toWalkSummaries([walk], ctx, rows);
   return ok({ walk: summaries[0], members, messages, myDogs });
 }
 

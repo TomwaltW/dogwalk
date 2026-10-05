@@ -12,6 +12,7 @@
 
 const { COLL, TEMPLATE_KEYS } = require('../_shared/contracts');
 const { ok, fail, CODES } = require('../_shared/errors');
+const { ensureUser } = require('../_shared/users');
 
 const VALID_KEYS = Object.values(TEMPLATE_KEYS);
 
@@ -35,10 +36,9 @@ module.exports = async function core(event, ctx) {
 
   const users = ctx.db.collection(COLL.USERS);
 
-  // 没登录过就没有账本。这里不顺手建文档:users 的形状归 login 管(spec 3.5)。
-  const found = await users.where({ _openid: ctx.openid }).limit(1).get();
-  const user = found.data[0];
-  if (!user) return fail(CODES.NOT_FOUND, COLL.USERS);
+  // 没点过「登录」的用户也会开走失模式授权订阅,账本不在就按 login 的同一形状建一份,
+  // 否则这次授权白白丢掉,路人留言时主人收不到通知(形状见 _shared/users.js)。
+  const { user } = await ensureUser(ctx);
 
   await users.doc(user._id).update({
     data: {
